@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel, getCaptureSettings, getReportSettings } from '../src/model.js';
+import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel, getCaptureSettings, getReportSettings, getTargetSettings } from '../src/model.js';
 
 function close(actual, expected, relativeTolerance = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= relativeTolerance * Math.max(1, Math.abs(expected)), `${actual} ≈ ${expected}`);
@@ -442,4 +442,196 @@ test('capture and reporting options are not mutated and do not change the weathe
   first.captureSettings.levelMultiplier = 100;
   first.reportSettings.perCaptureRefund = 0;
   assert.equal(calculate(defaultWeights(), 'captures', 8, options).levelMultiplier, .2);
+});
+
+test('single default 16% base probability matches the one-type matrix population', () => {
+  const weighted = calculate(defaultWeights());
+  const custom = calculate(undefined, 'throws', 0, {targetMode:'single'});
+  assert.equal(custom.valid, true);
+  assert.equal(custom.targetMode, 'single');
+  assert.equal(custom.baseProbability, .16);
+  assert.deepEqual(custom.normalizedWeights, [1]);
+  custom.results.forEach((entry, index) => {
+    close(entry.p, weighted.results[index].p);
+    close(entry.expectedCubes, weighted.results[index].expectedCubes);
+    close(entry.expectedCost, weighted.results[index].expectedCost);
+    close(entry.expectedNetCost, weighted.results[index].expectedNetCost);
+    assert.equal(entry.frontBack.length, 1);
+    assert.equal(entry.frontBack[0].base, .16);
+    assert.equal(entry.frontBack[0].region, '自定义');
+    assert.equal(entry.frontBack[0].stage, '单一目标');
+  });
+  assert.equal(weighted.targetMode, 'weights');
+  assert.equal(getTargetSettings().targetMode, 'weights');
+});
+
+test('single target mode ignores absent, zero and invalid inactive weights completely', () => {
+  for (const ignored of [undefined, null, {}, [], Array(15).fill(0), Array(15).fill(-1), Array(15).fill(NaN), Array(15).fill(Infinity)]) {
+    const value = calculate(ignored, 'throws', 0, {targetMode:'single',baseProbability:.3});
+    assert.equal(value.valid, true);
+    assert.deepEqual(value.normalizedWeights, [1]);
+    close(value.results[0].p, .355);
+  }
+  const zeroCost = calculate(undefined, 'captures', 22, {targetMode:'single',baseProbability:0});
+  assert.equal(zeroCost.valid, true);
+  zeroCost.results.forEach((entry) => {
+    assert.equal(entry.p, .01);
+    assert.equal(entry.expectedCost, 0);
+    assert.equal(entry.expectedRefund, 0);
+  });
+});
+
+test('single 0% and 100% bases still include the fixed bonus and branch caps', () => {
+  for (const beta of [0,.3,1]) {
+    const zero = calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability:0,backAttackProbability:beta});
+    const full = calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability:1,backAttackProbability:beta});
+    zero.results.forEach((entry) => assert.equal(entry.p, .01));
+    full.results.forEach((entry) => assert.equal(entry.p, 1));
+  }
+});
+
+test('single input is a base rate to which cube, level and back multipliers are applied', () => {
+  const options = {targetMode:'single',baseProbability:.5,levelDifference:11,backAttackProbability:.4};
+  const value = calculate(undefined, 'throws', 0, options);
+  const probabilities = [.49,.73,.886];
+  const fronts = [.41,.61,.81];
+  const backs = [.61,.91,1];
+  value.results.forEach((entry, index) => {
+    close(entry.frontBack[0].front, fronts[index]);
+    close(entry.frontBack[0].back, backs[index]);
+    close(entry.p, probabilities[index]);
+  });
+  const captures = calculate(undefined, 'captures', 0, options);
+  captures.results.forEach((entry, index) => assert.equal(entry.p, value.results[index].p));
+});
+
+test('active single target values validate strictly while inactive bases do not block weights mode', () => {
+  for (const baseProbability of [-.1,1.1,NaN,Infinity,-Infinity,'0.16',null]) {
+    assert.equal(getTargetSettings({targetMode:'single',baseProbability}).valid, false);
+    assert.equal(calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability}).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 0, {targetMode:'weights',baseProbability}).valid, true);
+  }
+  for (const targetMode of ['unknown',null,1]) {
+    assert.equal(getTargetSettings({targetMode}).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 0, {targetMode}).valid, false);
+  }
+  assert.equal(calculate(undefined).valid, false);
+  assert.equal(calculate(Array(15).fill(0)).valid, false);
+});
+
+test('single base changes neither weather stopping counts nor per-capture reporting refund', () => {
+  const weighted = calculate(defaultWeights(), 'captures', 9, {reportBonusRate:.5});
+  const options = Object.freeze({targetMode:'single',baseProbability:.71,reportBonusRate:.5});
+  const custom = calculate(undefined, 'captures', 9, options);
+  assert.equal(custom.expectedCaptures, weighted.expectedCaptures);
+  assert.equal(custom.modelSamples, weighted.modelSamples);
+  assert.deepEqual(custom.ci95, weighted.ci95);
+  assert.equal(custom.perCaptureRefund, weighted.perCaptureRefund);
+  assert.equal(custom.expectedRefund, weighted.expectedRefund);
+  assert.equal(options.baseProbability, .71);
+  custom.targetSettings.baseProbability = 0;
+  assert.equal(calculate(undefined, 'captures', 9, options).baseProbability, .71);
+});
+
+test('capture bonuses default to additive one percentage point and official mode means relative 1%', () => {
+  const defaults = getCaptureSettings();
+  assert.equal(defaults.captureBonusMode, 'additive');
+  assert.equal(defaults.captureBonusRate, .01);
+  const additive = calculate(defaultWeights());
+  const explicit = calculate(defaultWeights(), 'throws', 0, {captureBonusMode:'additive',captureBonusRate:.01});
+  assert.deepEqual(additive, explicit);
+  const official = calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability:.16,captureBonusMode:'official',captureBonusRate:.01});
+  official.results.forEach((entry, index) => close(entry.p, [.18584,.27876,.37168][index]));
+  additive.results.forEach((entry, index) => assert.ok(entry.p > official.results[index].p));
+});
+
+test('zero capture bonus makes both calculation conventions identical', () => {
+  const options = {captureBonusRate:0,backAttackProbability:.8,levelDifference:12};
+  for (const mode of ['throws','captures']) {
+    const additive = calculate(Array(15).fill(1), mode, 3, {...options,captureBonusMode:'additive'});
+    const official = calculate(Array(15).fill(1), mode, 3, {...options,captureBonusMode:'official'});
+    additive.results.forEach((entry, index) => {
+      assert.equal(entry.p, official.results[index].p);
+      assert.equal(entry.expectedCost, official.results[index].expectedCost);
+    });
+  }
+});
+
+test('both capture conventions cap individual branches before mixing and accept larger bonuses', () => {
+  const options = {targetMode:'single',baseProbability:.56,captureBonusRate:.1};
+  const additive = calculate(undefined, 'throws', 0, {...options,captureBonusMode:'additive'});
+  const official = calculate(undefined, 'throws', 0, {...options,captureBonusMode:'official'});
+  close(additive.results[1].frontBack[0].front, .94);
+  assert.equal(additive.results[1].frontBack[0].back, 1);
+  close(additive.results[1].p, .958);
+  close(official.results[1].frontBack[0].front, .924);
+  assert.equal(official.results[1].frontBack[0].back, 1);
+  close(official.results[1].p, .9468);
+  for (const rate of [1,2,Number.MAX_VALUE]) {
+    const value = calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability:0,captureBonusMode:'additive',captureBonusRate:rate});
+    assert.equal(value.valid, true);
+    value.results.forEach((entry) => assert.equal(entry.p, 1));
+  }
+  const hugeOfficial = calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability:.1,captureBonusMode:'official',captureBonusRate:Number.MAX_VALUE});
+  assert.equal(hugeOfficial.valid, true);
+  hugeOfficial.results.forEach((entry) => assert.equal(entry.p, 1));
+});
+
+test('zero effective success probability gives a friendly unreachable error until essence guarantees weather', () => {
+  const cases = [
+    {captureBonusMode:'official',captureBonusRate:0},
+    {captureBonusMode:'official',captureBonusRate:.01},
+    {captureBonusMode:'official',captureBonusRate:Number.MAX_VALUE},
+    {captureBonusMode:'additive',captureBonusRate:0},
+  ];
+  for (const bonus of cases) {
+    const options = {targetMode:'single',baseProbability:0,...bonus};
+    for (const n of [0,1,21]) {
+      const value = calculate(undefined, 'throws', n, options);
+      assert.equal(value.valid, false);
+      assert.match(value.error, /捕获概率为0/);
+      assert.deepEqual(value.results, []);
+    }
+    const completed = calculate(undefined, 'throws', 22, options);
+    assert.equal(completed.valid, true);
+    completed.results.forEach((entry) => {
+      assert.equal(entry.p, 0);
+      assert.equal(entry.costPerCapture, null);
+      assert.equal(entry.expectedCost, 0);
+      assert.equal(entry.expectedRefund, 0);
+      assert.equal(entry.expectedNetCost, 0);
+      assert.deepEqual(entry.expectedCostCi95, [0,0]);
+    });
+  }
+});
+
+test('capture convention and rate validation reject invalid values rather than emitting NaN amounts', () => {
+  for (const captureBonusMode of ['unknown',null,0]) {
+    assert.equal(getCaptureSettings({captureBonusMode}).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 0, {captureBonusMode}).valid, false);
+  }
+  for (const captureBonusRate of [-.1,NaN,Infinity,-Infinity,'0.01',null]) {
+    assert.equal(getCaptureSettings({captureBonusRate}).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 0, {captureBonusRate}).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 22, {captureBonusRate}).valid, false);
+  }
+  const tooSmall = calculate(undefined, 'throws', 0, {targetMode:'single',baseProbability:Number.MIN_VALUE,captureBonusMode:'official',captureBonusRate:0});
+  assert.equal(tooSmall.valid, false);
+  assert.deepEqual(tooSmall.results, []);
+});
+
+test('combined custom bonus settings remain pure and leave weather and refund mechanics unchanged', () => {
+  const options = Object.freeze({targetMode:'single',baseProbability:.16,levelDifference:14,backAttackProbability:.8,captureBonusMode:'official',captureBonusRate:.3,reportBonusRate:.5});
+  const value = calculate(undefined, 'captures', 10, options);
+  const defaultValue = calculate(defaultWeights(), 'captures', 10, {reportBonusRate:.5});
+  assert.equal(value.valid, true);
+  close(value.results[0].frontBack[0].front, .0416);
+  close(value.results[0].frontBack[0].back, .0624);
+  close(value.results[0].p, .05824);
+  assert.equal(value.expectedCaptures, defaultValue.expectedCaptures);
+  assert.deepEqual(value.ci95, defaultValue.ci95);
+  assert.equal(value.expectedRefund, defaultValue.expectedRefund);
+  assert.equal(options.captureBonusRate, .3);
+  value.captureSettings.captureBonusRate = 100;
+  assert.equal(calculate(undefined, 'captures', 10, options).captureBonusRate, .3);
 });

@@ -24,7 +24,7 @@
         <h1 id="page-title">一场虹天气，<br>净花多少<span class="title-emphasis">金币</span>？</h1>
         <p class="hero-description">精华直出、幸运直出、满虹能保底，<strong>任一路径出天气即完成</strong>。<br>算清立方支出与基础汇报返还，精华成本未计入。</p>
         <div class="hero-actions"><a class="button button-dark" href="#calculator">开始计算 <span aria-hidden="true">↗</span></a><a class="text-link" href="#method">看看怎么算 <span aria-hidden="true">↓</span></a></div>
-        <div class="hero-tags"><span>本周从 0 次开始</span><span>普通伊莫 · 战斗外</span><span>最终 +1 个百分点</span></div>
+        <div class="hero-tags"><span>本周从 0 次开始</span><span>普通伊莫 · 战斗外</span><span id="capture-bonus-note">最终 +1 个百分点</span></div>
       </div>
       <div class="hero-art" aria-hidden="true">
         <div class="art-grid"></div>
@@ -60,6 +60,7 @@
           <section class="setting-group" aria-labelledby="position-heading"><div class="setting-title"><h3 id="position-heading">正面 / 背面配比</h3><span class="source-badge user">用户输入</span></div><div class="position-inputs"><label for="front-percent">正面<span class="percent-input"><input id="front-percent" type="number" min="0" max="100" step="any" inputmode="decimal" value="70"><span>%</span></span></label><span class="setting-plus" aria-hidden="true">+</span><label for="back-percent">背面<span class="percent-input"><input id="back-percent" type="number" min="0" max="100" step="any" inputmode="decimal" value="30"><span>%</span></span></label></div><p class="setting-help">编辑一项，另一项自动互补，始终合计 100%。</p></section>
           <section class="setting-group" aria-labelledby="level-heading"><div class="setting-title"><h3 id="level-heading">捕捉等级差</h3><span class="source-badge official">官网系数</span></div><div class="level-input-row"><label for="level-difference" class="sr-only">伊莫等级减联结者等级</label><input id="level-difference" type="number" step="1" value="10" aria-describedby="level-help"><span id="level-multiplier" class="level-multiplier">当前系数 ×1</span></div><p id="level-help" class="setting-help">伊莫等级 − 联结者等级；填整数，允许负数。</p><div class="level-bands" aria-label="官网等级系数表"><span>≤10 <strong>×1</strong></span><span>11 <strong>×0.8</strong></span><span>12 <strong>×0.6</strong></span><span>13 <strong>×0.4</strong></span><span>14 <strong>×0.2</strong></span><span>≥15 <strong>×0.1</strong></span></div></section>
           <section class="setting-group" aria-labelledby="report-heading"><div class="setting-title"><h3 id="report-heading">汇报金币加成</h3><span class="source-badge user">用户确认</span></div><label for="report-bonus" class="sr-only">汇报金币加成百分比</label><div class="report-input-row"><span class="percent-input"><input id="report-bonus" type="number" min="0" step="any" inputmode="decimal" value="30"><span>%</span></span><span class="report-per-capture" id="report-per-capture">每只实收 1,560 金币</span></div><p class="setting-help">基础 1,200 ×（1 + 加成）。仅计基础汇报，不含资质、幽黯等额外奖励。</p></section>
+          <section class="setting-group" aria-labelledby="capture-bonus-heading"><div class="setting-title"><h3 id="capture-bonus-heading">捕获概率加成</h3><span id="capture-bonus-source" class="source-badge user">最终加算口径</span></div><label for="capture-bonus-mode" class="sr-only">捕获概率加成口径</label><select id="capture-bonus-mode"><option value="additive">最终加算 · 加百分点</option><option value="official">官网乘算 · 相对提高</option></select><div class="capture-bonus-value"><label for="capture-bonus-percent">加成数值</label><span class="percent-input"><input id="capture-bonus-percent" type="number" min="0" step="any" inputmode="decimal" value="1" aria-describedby="capture-bonus-help"><span>%</span></span></div><p id="capture-bonus-help" class="setting-help">最终加算的 1% 表示最终成功率 +1 个百分点；官网乘算的 1% 表示基础概率 ×1.01。</p></section>
         </div>
         <div id="settings-error" class="input-error" role="alert" hidden></div>
       </div>
@@ -75,13 +76,17 @@
             <div id="essence-error" class="input-error" role="alert" hidden></div>
           </div>
           <div class="panel-heading"><h3>捕捉对象配比</h3><span class="source-badge user">用户输入</span></div>
+          <fieldset class="mode-switch target-mode-switch"><legend class="sr-only">捕捉对象设置方式</legend><label><input type="radio" name="target-mode" value="weights" checked><span>15类对象配比</span></label><label><input type="radio" name="target-mode" value="single"><span>单一基础概率</span></label></fieldset>
+          <div id="single-base-controls" class="single-base-panel" hidden><label for="single-base-percent">这一种伊莫的基础捕获率 <span class="source-badge user">用户输入</span></label><span class="percent-input"><input id="single-base-percent" type="number" min="0" max="100" step="any" inputmode="decimal" value="16" aria-describedby="single-base-help"><span>%</span></span><p id="single-base-help" class="field-help">只抓这一种伊莫，仍应用立方倍率、等级系数、正背比例与当前捕获加成。这里填基础概率，不是修正后的最终成功率。</p></div>
+          <div id="weights-controls">
           <fieldset class="mode-switch"><legend class="sr-only">权重的含义</legend><label><input type="radio" name="weight-mode" value="throws" checked><span>投掷目标占比</span></label><label><input type="radio" name="weight-mode" value="captures"><span>成功捕获占比</span></label></fieldset>
           <p id="mode-description" class="field-help">每次投掷选择各类目标的占比，权重会自动归一化。</p>
           <table class="weight-table"><caption class="sr-only">五类区域与三个成长阶段的捕捉权重。单元格下方为官网基础捕捉率与归一化占比。</caption><colgroup><col class="region-col"><col><col><col></colgroup><thead><tr><th scope="col">区域</th><th scope="col">新生期</th><th scope="col">成长期</th><th scope="col">成熟期</th></tr></thead><tbody id="weight-grid"></tbody></table>
           <p class="table-legend">输入框下方：<span>左侧为官网基础率</span> · <span>右侧为归一化占比</span></p>
+          <p class="small-note"><span class="note-square"></span>可填 1、2、3 等相对权重，也可填百分比。默认仅捕捉后期区域·成熟期。</p>
+          </div>
           <div class="weight-footer"><span id="weight-total" class="weight-total">权重合计 <strong>1</strong></span><div><button type="button" class="text-button" id="reset-weights">恢复默认</button><button type="button" class="text-button subtle" id="clear-weights">清空</button></div></div>
           <div id="input-error" class="input-error" role="alert" hidden></div>
-          <p class="small-note"><span class="note-square"></span>可填 1、2、3 等相对权重，也可填百分比。默认仅捕捉后期区域·成熟期。</p>
         </div>
         <div class="results-panel" aria-labelledby="results-title">
           <div class="results-heading"><div><p class="eyebrow">EXPECTED NET COST</p><h3 id="results-title">三种立方，比较净花费。</h3></div><span class="unit-tag">单位：万金币</span></div>
@@ -94,18 +99,18 @@
 
     <section id="method" class="method-section" aria-labelledby="method-title"><div class="shell">
       <div class="section-heading"><div><p class="eyebrow">02 / BEHIND THE NUMBERS</p><h2 id="method-title">每一步，都算得明白。</h2></div><p>捕获率 → 出天气停止次数 → 净花费<br>公式、代入与来源，一起展开。</p></div>
-      <div class="explain-controls"><span>查看一次具体计算</span><label><span class="sr-only">选择立方</span><select id="explain-cube"></select></label><label><span class="sr-only">选择伊莫区域与成长阶段</span><select id="explain-target"></select></label></div>
+      <div class="explain-controls"><span>查看一次具体计算</span><label><span class="sr-only">选择立方</span><select id="explain-cube"></select></label><label id="explain-target-control"><span class="sr-only">选择伊莫区域与成长阶段</span><select id="explain-target"></select></label><span id="explain-custom-target" class="custom-target-label" hidden>单一目标 · 基础率 16%</span></div>
 
       <article class="method-card">
         <div class="method-number"><span>01</span><small>CAPTURE</small></div>
         <div class="method-content"><div class="method-title"><h3>从基础概率，算出真实捕获率。</h3><div class="badge-group"><span class="source-badge official">官网公示</span><span class="source-badge user">用户给定</span><span class="source-badge assumption">建模假设</span></div></div>
           <div id="capture-flow" class="capture-flow"></div>
           <div class="formula-block"><div id="formula-capture" class="math-equation"></div><p id="capture-branch-description">先对每个正面、背面分支分别封顶到 100%，再按当前正背比例加权。</p><div id="formula-capture-numeric" class="math-equation numeric"></div></div>
-          <dl class="symbol-grid"><div><dt><var>b<sub>i</sub></var> · 基础捕获率</dt><dd>第 i 类普通伊莫的官网概率，无单位；由区域和成长阶段决定。</dd></div><div><dt><var>m</var> · 立方倍率</dt><dd>谜立方 1、超级 1.5、究极 2；无单位，来自官网。</dd></div><div><dt><var>δ</var> · 最终加算</dt><dd>0.01，即额外 1 个百分点；由用户指定，在乘法完成后加入。</dd></div><div><dt><var>p<sub>i,m</sub></var> · 单类捕获率</dt><dd>第 i 类目标使用该立方时，每次投掷成功的概率，无单位。</dd></div></dl>
+          <dl class="symbol-grid"><div><dt><var>b<sub>i</sub></var> · 基础捕获率</dt><dd id="base-probability-definition">15类配比模式取官网区域与成长阶段概率；单一模式取用户输入的基础概率，均无单位。</dd></div><div><dt><var>m</var> · 立方倍率</dt><dd>谜立方 1、超级 1.5、究极 2；无单位，来自官网。</dd></div><div><dt><var>η</var> · 捕获概率加成</dt><dd id="capture-bonus-definition">加成百分比除以100，得到无单位加成比例。最终加算时直接加入每个分支；官网乘算时基础概率乘以(1+η)。默认1%，口径可切换。</dd></div><div><dt><var>p<sub>i,m</sub></var> · 单类捕获率</dt><dd>第 i 类目标使用该立方时，每次投掷成功的概率，无单位。</dd></div></dl>
           <dl class="symbol-grid"><div><dt><var>β</var> · 背面占比</dt><dd>由上方百分比输入决定的概率，无单位；正面占比为 1−β。默认 β=0.3，可调。</dd></div><div><dt><var>Δ</var> / <var>L(Δ)</var> · 等级差 / 系数</dt><dd>Δ = 伊莫等级 − 联结者等级，单位“级”，可为负整数；L 按上方官网分档表取值，无单位。</dd></div></dl>
           <div class="inline-note" id="capture-assumptions">1.5 是官网背袭倍率；正背比例与等级差可调，当前值参与所有计算。状态系数假定为 1。全部在战斗外，因此满血不乘战斗内的 0.8 系数。</div>
-          <div class="formula-block mix-formula"><h4>再把 15 类目标，合成这条路线的捕获率。</h4><div id="formula-weights" class="math-equation"></div><div id="formula-mix" class="math-equation"></div><p id="mix-formula-description"></p><div id="formula-mix-numeric" class="math-equation numeric"></div></div>
-          <dl class="symbol-grid compact"><div><dt><var>w<sub>i</sub></var> / <var>α<sub>i</sub></var></dt><dd>输入的非负相对权重 / 归一化占比；均无单位。</dd></div><div><dt><var>P<sub>m</sub></var> · 折算捕获率</dt><dd>该立方在当前配比下的每次投掷成功率；成功构成模式下是每次成功平均用球数的倒数。</dd></div></dl>
+          <div class="formula-block mix-formula"><h4 id="mix-formula-title">再把 15 类目标，合成这条路线的捕获率。</h4><div id="formula-weights" class="math-equation"></div><div id="formula-mix" class="math-equation"></div><p id="mix-formula-description"></p><div id="formula-mix-numeric" class="math-equation numeric"></div></div>
+          <dl class="symbol-grid compact"><div id="weight-symbol-definitions"><dt><var>w<sub>i</sub></var> / <var>α<sub>i</sub></var></dt><dd>输入的非负相对权重 / 归一化占比；均无单位。</dd></div><div><dt><var>P<sub>m</sub></var> · 折算捕获率</dt><dd id="effective-probability-definition">该立方在当前配比下的每次投掷成功率；成功构成模式下是每次成功平均用球数的倒数。</dd></div></dl>
         </div>
       </article>
 
@@ -133,8 +138,8 @@
     <section id="sources" class="sources-section shell" aria-labelledby="sources-title">
       <div class="section-heading"><div><p class="eyebrow">03 / OPEN NOTES</p><h2 id="sources-title">数字有出处，假设也透明。</h2></div><a class="text-link" href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">阅读官网概率公示 <span aria-hidden="true">↗</span></a></div>
       <div class="sources-grid">
-        <article class="source-card"><span class="source-badge official">官网公示</span><h3>游戏公布的规则</h3><p>15 类基础捕获率、立方倍率、背袭 ×1.5、等级差系数表，以及幸运事件触发概率、保底、虹能奖励。精华每次 3% 直接出天气，未直出时 +480 虹能；普通和超级幸运事件各有 0.6% 直接天气，虹能保底为 10,500。</p><a href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">《伊莫》概率公示 ↗</a><small>规则核对：2026-10-30</small></article>
-        <article class="source-card"><span class="source-badge user">用户给定 / 确认</span><h3>路线、价格与基础汇报</h3><p>立方单价 3,500 / 7,000 / 10,500 金币；最终概率额外加 1 个百分点；普通伊莫、全部战斗外、满血。正背比例、等级差、最多精华次数和汇报加成可调；默认正面 70%、背面 30%、等级差 10、精华 0 次、汇报加成 30%。基础汇报 1,200 金币由用户确认，默认每只 1,560 金币，并非本页引用的官网公示数据。</p><small>仅计算立方支出与基础汇报返还，不计精华自身成本及资质、幽黯等奖励。</small></article>
+        <article class="source-card"><span class="source-badge official">官网公示</span><h3>游戏公布的规则</h3><p>15类基础捕获率、立方倍率、背袭×1.5、等级差系数表、联结者捕获加成乘算公式，以及幸运事件触发概率、保底、虹能奖励。精华每次 3% 直接出天气，未直出时 +480 虹能；普通和超级幸运事件各有 0.6% 直接天气，虹能保底为 10,500。</p><a href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">《伊莫》概率公示 ↗</a><small>规则核对：2026-10-30</small></article>
+        <article class="source-card"><span class="source-badge user">用户给定 / 确认</span><h3>路线、价格与基础汇报</h3><p>立方单价 3,500 / 7,000 / 10,500 金币；捕获加成默认1%、最终加算口径，可切换官网乘算并编辑数值；普通伊莫、全部战斗外、满血。正背比例、等级差、最多精华次数和汇报加成可调；默认正面70%、背面30%、等级差10、精华0次、汇报加成30%。目标可选15类官网配比或用户输入单一基础概率，单一模式默认16%。基础汇报 1,200 金币由用户确认，默认每只 1,560 金币，并非本页引用的官网公示数据。</p><small>仅计算立方支出与基础汇报返还，不计精华自身成本及资质、幽黯等奖励。</small></article>
         <article class="source-card"><span class="source-badge simulation">模拟结果</span><h3>500 万条天气停止路径</h3><p>按每周幸运档位、独立保底、奖励与每次幸运事件 0.6% 天气直出，记录各剩余门槛的首次完成次数。共享路径分别统计条件 K<sub>w</sub>(r)；以 0.97<sup>a</sup> 合并精华提前完成路径，得到最终 E[N]。改变正背、等级或汇报加成，不改变天气停止次数。</p><a href="./data/weather-results.json" target="_blank" rel="noopener noreferrer">天气模型查表数据 ↗</a> <a href="https://github.com/uiharuayako/yimo-kira-cost" target="_blank" rel="noopener noreferrer">查看复算代码 ↗</a><small>当前模型纳入直出天气；页面区间仅表示蒙特卡洛均值误差。</small></article>
         <article class="source-card assumptions"><span class="source-badge assumption">建模假设</span><h3>公示之外，明确约定</h3><ul><li>只抓普通伊莫，排除头目；所有成功捕获都符合幸运判定条件，状态系数为 1。</li><li>初始虹能为 0；最多先滋养 n 次，出天气或虹能保底即停，再在未完成路径中捕获。本周两类幸运次数和保底计数从 0 开始，全程不跨周。</li><li>两类保底各自累计，仅触发本类时重置；超级触发当次普通判定与普通保底计数暂停。</li><li>精华每次 3% 直出、每次幸运事件 0.6% 直出，按独立判定处理；直出立即完成，未直出才增加相应虹能。</li><li>正背面、捕获成败与后续幸运事件按给定概率独立处理；每只成功捕获都提交基础汇报，包括触发天气的最后一只。</li></ul></article>
       </div>
