@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { WEATHER_ESTIMATES } from '../src/weather-estimates.js';
 import { WEATHER_DISTRIBUTION } from '../src/weather-distribution-data.js';
+import { WEATHER_THRESHOLDS } from '../src/weather-threshold-data.js';
+import { getEnergyModel } from '../src/model.js';
 import { getWeatherDistribution, discreteQuantile, getIntervalProbability, getDistributionBins } from '../src/distribution.js';
 
 const close = (a, b, tolerance = 1e-10) => assert.ok(Math.abs(a-b) <= tolerance * Math.max(1, Math.abs(b)), `${a} != ${b}`);
@@ -98,4 +100,40 @@ test('unusable requests return a friendly result and do not emit invalid probabi
   assert.equal(getIntervalProbability(d,5,4),null);
   assert.equal(getIntervalProbability(d,NaN,5),null);
   assert.deepEqual(getDistributionBins(d,0),[]);
+});
+
+test('normal and boosted essences independently combine energy and the zero-capture weather branch', () => {
+  for(const [ordinary,boosted] of [[0,1],[1,0],[1,1],[3,2],[0,14],[20,1],[21,0]]){
+    const options={boostedEssenceCount:boosted};
+    const energy=getEnergyModel(ordinary,options),d=getWeatherDistribution(ordinary,options);
+    assert.equal(d.valid,true);assert.equal(d.boostedEssenceCount,boosted);
+    close(d.mean,energy.expectedCaptures);
+    close(d.zeroCaptureProbability,1-.97**(ordinary+boosted));
+    close(d.pmf.reduce((sum,p)=>sum+p,0),1);
+    const row=WEATHER_THRESHOLDS.thresholds.find(item=>item.remainingEnergy===10500-480*ordinary-720*boosted);
+    close(d.firstCaptureProbability,.97**(ordinary+boosted)*row.counts[0]/WEATHER_THRESHOLDS.samples);
+    assert.equal(d.quantiles[0].n,0);
+  }
+});
+
+test('equal remaining energy with different total attempts must not share the zero-capture mixture', () => {
+  const normal=getWeatherDistribution(21);
+  const boosted=getWeatherDistribution(0,{boostedEssenceCount:14});
+  assert.equal(normal.observedMax,boosted.observedMax);
+  assert.notEqual(normal.zeroCaptureProbability,boosted.zeroCaptureProbability);
+  close(normal.mean/boosted.mean,.97**7);
+  close(normal.pmf[122]/boosted.pmf[122],.97**7);
+  assert.equal(normal.quantiles.find(q=>q.luck===50).n,17);
+  assert.ok(boosted.quantiles.find(q=>q.luck===50).n>17);
+});
+
+test('either essence type or a mixture can guarantee zero catches without an order parameter', () => {
+  for(const [ordinary,boosted] of [[22,0],[0,15],[1,14],[10,8],[Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER]]){
+    const d=getWeatherDistribution(ordinary,{boostedEssenceCount:boosted});
+    assert.equal(d.valid,true);assert.deepEqual([...d.pmf],[1]);
+    assert.equal(d.mean,0);assert.equal(d.zeroCaptureProbability,1);
+    assert.equal(d.essenceCount,ordinary);assert.equal(d.boostedEssenceCount,boosted);
+    assert.ok(d.quantiles.every(q=>q.n===0));
+  }
+  for(const value of [-1,.5,NaN,Infinity,'1',null]) assert.equal(getWeatherDistribution(0,{boostedEssenceCount:value}).valid,false);
 });

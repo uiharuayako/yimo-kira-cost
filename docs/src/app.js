@@ -1,6 +1,6 @@
-import katex from '../vendor/katex/katex.mjs?v=21e86f820207';
-import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel, getCaptureSettings, getReportSettings, getTargetSettings } from './model.js?v=21e86f820207';
-import { getWeatherDistribution, getIntervalProbability, getDistributionBins } from './distribution.js?v=21e86f820207';
+import katex from '../vendor/katex/katex.mjs?v=c997aab634c1';
+import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel, getCaptureSettings, getReportSettings, getTargetSettings } from './model.js?v=c997aab634c1';
+import { getWeatherDistribution, getIntervalProbability, getDistributionBins } from './distribution.js?v=c997aab634c1';
 
 const STORAGE_KEY = 'yimo-kira-lab:v1';
 const $ = (id) => document.getElementById(id);
@@ -23,6 +23,7 @@ function restoredState() {
       weights: data.weights,
       mode: data.mode === 'captures' ? 'captures' : 'throws',
       essenceCount: Number.isSafeInteger(data.essenceCount) && data.essenceCount >= 0 ? data.essenceCount : 0,
+      boostedEssenceCount: Number.isSafeInteger(data.boostedEssenceCount) && data.boostedEssenceCount >= 0 ? data.boostedEssenceCount : 0,
       backAttackProbability: Number.isFinite(data.backAttackProbability) && data.backAttackProbability >= 0 && data.backAttackProbability <= 1 ? data.backAttackProbability : .3,
       levelDifference: Number.isSafeInteger(data.levelDifference) ? data.levelDifference : 10,
       reportBonusRate: Number.isFinite(data.reportBonusRate) && data.reportBonusRate >= 0 ? data.reportBonusRate : .3,
@@ -34,8 +35,8 @@ function restoredState() {
   } catch { return null; }
 }
 const saved = restoredState();
-const state = { weights: defaultWeights(), mode: 'throws', essenceCount: 0, backAttackProbability: .3, levelDifference: 10, reportBonusRate: .3, targetMode: 'weights', baseProbability: .16, captureBonusMode: 'additive', captureBonusRate: .01, ...saved, cube: CUBES[0].id, target: 14 };
-const options = () => ({ backAttackProbability: state.backAttackProbability, levelDifference: state.levelDifference, reportBonusRate: state.reportBonusRate, targetMode: state.targetMode, baseProbability: state.baseProbability, captureBonusMode: state.captureBonusMode, captureBonusRate: state.captureBonusRate });
+const state = { weights: defaultWeights(), mode: 'throws', essenceCount: 0, boostedEssenceCount: 0, backAttackProbability: .3, levelDifference: 10, reportBonusRate: .3, targetMode: 'weights', baseProbability: .16, captureBonusMode: 'additive', captureBonusRate: .01, ...saved, cube: CUBES[0].id, target: 14 };
+const options = () => ({ backAttackProbability: state.backAttackProbability, levelDifference: state.levelDifference, reportBonusRate: state.reportBonusRate, targetMode: state.targetMode, baseProbability: state.baseProbability, captureBonusMode: state.captureBonusMode, captureBonusRate: state.captureBonusRate, boostedEssenceCount: state.boostedEssenceCount });
 const currentCalculation = () => calculate(state.weights, state.mode, state.essenceCount, options());
 const initial = currentCalculation();
 if (state.targetMode === 'weights' && initial.valid && initial.normalizedWeights.some(w => w > 0)) state.target = initial.normalizedWeights.indexOf(Math.max(...initial.normalizedWeights));
@@ -53,6 +54,7 @@ $('explain-target').value = String(state.target);
 
 function syncInputValues() {
   $('essence-count').value = String(state.essenceCount);
+  $('boosted-essence-count').value = String(state.boostedEssenceCount);
   $('front-percent').value = decimal((1 - state.backAttackProbability) * 100, 10);
   $('back-percent').value = decimal(state.backAttackProbability * 100, 10);
   $('level-difference').value = String(state.levelDifference);
@@ -70,18 +72,18 @@ const renderMath = (id, expression) => katex.render(expression, $(id), mathOptio
 function appendMath(id, expression) { const line = document.createElement('div'); katex.render(expression, line, mathOptions); $(id).append(line); }
 renderMath('formula-capture', String.raw`p_{i,m}=(1-\beta)\min(b_i mL(\Delta)+\eta,1)+\beta\min(1.5b_i mL(\Delta)+\eta,1)`);
 renderMath('formula-weights', String.raw`\alpha_i=\frac{w_i}{\sum_{j=1}^{15}w_j},\qquad \sum_{i=1}^{15}\alpha_i=1`);
-renderMath('formula-energy', String.raw`a=\min(n,22),\qquad r=\max(10\,500-480a,0)`);
-renderMath('formula-survival', String.raw`s=0.97^{a},\qquad P(\text{精华提前直出})=1-s`);
+renderMath('formula-energy', String.raw`a=u+v,\qquad E=480u+720v,\qquad r=\max(10\,500-E,0)`);
+renderMath('formula-survival', String.raw`s=0.97^{a},\qquad P(\text{精华提前直出})=1-s\quad(r>0)`);
 renderMath('formula-stop', String.raw`N_w(r)=\min\left\{t\ge0:W_t=1\ \text{或}\ \sum_{j=1}^{t}R_j\ge r\right\},\qquad K_w(r)=\mathbb E[N_w(r)]`);
-renderMath('formula-weather-mean', String.raw`\mathbb E[N]=\begin{cases}sK_w(r),&n<22\\0,&n\ge22\end{cases}`);
+renderMath('formula-weather-mean', String.raw`\mathbb E[N]=\begin{cases}sK_w(r),&r>0\\0,&r=0\end{cases}`);
 renderMath('formula-reward', String.raw`\mathbb E[R_{\mathrm{ordinary}}\mid\text{未直出}]=0.4(275)+0.5(300)+0.05(350)+0.05(500)=302.5`);
 renderMath('formula-geometric', String.raw`T=\min(G,H),\quad G\sim\operatorname{Geom}(q),\qquad \mathbb E[T]=\frac{1-(1-q)^H}{q}`);
 renderMath('formula-cost', String.raw`\mathbb E[B_m]=\frac{\mathbb E[N]}{P_m},\qquad \mathbb E[C_{\mathrm{gross},m}]=c_m\frac{\mathbb E[N]}{P_m}`);
 renderMath('formula-refund', String.raw`\mathbb E[F]=\mathbb E[N]\times1\,200(1+\gamma)`);
 renderMath('formula-net', String.raw`\mathbb E[C_{\mathrm{net},m}]=\mathbb E[C_{\mathrm{gross},m}]-\mathbb E[F]`);
-renderMath('formula-distribution-mixture', String.raw`h_n(k)=\frac{c_{n,k}}{M},\quad f(k)=\begin{cases}1-s,&k=0\\s\,h_n(k),&k\ge1\end{cases}\quad(n<22)`);
+renderMath('formula-distribution-mixture', String.raw`h_r(k)=\frac{c_{r,k}}{M},\quad f(k)=\begin{cases}1-s,&k=0\\s\,h_r(k),&k\ge1\end{cases}\quad(r>0)`);
 renderMath('formula-distribution', String.raw`f(k)=P(N=k),\quad F(k)=\sum_{j=0}^{k}f(j),\quad P(L\le N\le U)=F(U)-F(L-1)`);
-renderMath('formula-luck-quantile', String.raw`u=\frac{100-\ell}{100},\quad p\ell=\min\{k:F(k)\ge u\}\ (u>0),\quad p100=\min\operatorname{supp}(N)`);
+renderMath('formula-luck-quantile', String.raw`\tau=\frac{100-\ell}{100},\quad p\ell=\min\{k:F(k)\ge\tau\}\ (\tau>0),\quad p100=\min\operatorname{supp}(N)`);
 renderMath('formula-first-weather', String.raw`P(\text{首抓直出})=s\,[0.002+(1-0.002)\times0.01]\times0.006=s\times0.00007188`);
 
 function remember() {
@@ -131,23 +133,27 @@ function updateSettings(capture, report, result) {
 }
 
 function updateEnergy(energy) {
-  $('essence-count').setAttribute('aria-invalid', String(!energy.valid));
+  $('essence-count').setAttribute('aria-invalid', String(!Number.isSafeInteger(state.essenceCount)||state.essenceCount<0));
+  $('boosted-essence-count').setAttribute('aria-invalid', String(!Number.isSafeInteger(state.boostedEssenceCount)||state.boostedEssenceCount<0));
   $('essence-error').hidden = energy.valid;
   $('essence-error').textContent = energy.valid ? '' : energy.error;
   const progress = energy.valid ? Math.min(energy.essenceEnergy, MODEL.targetEnergy) : 0;
-  $('essence-energy').textContent = energy.valid ? integer.format(energy.essenceEnergy) : '—';
+  $('essence-energy').textContent = energy.valid ? integer.format(energy.essenceEnergyExact ? BigInt(energy.essenceEnergyExact) : energy.essenceEnergy) : '—';
   $('essence-progress').setAttribute('aria-valuenow', String(progress));
   $('essence-progress-fill').style.width = `${progress / MODEL.targetEnergy * 100}%`;
-  $('essence-direct-probability').textContent = energy.valid ? percent(energy.directEssenceWeatherProbability, 2) : '—';
-  $('essence-survival-probability').textContent = energy.valid ? percent(energy.survivalProb, 2) : '—';
-  $('energy-remaining').innerHTML = !energy.valid ? '请输入非负整数次数。' : energy.noCaptureNeeded ? '<strong>最迟第 22 次由虹能保底完成，无需捕获。</strong>' : `若精华未直出，剩余保底 <strong>${integer.format(energy.remainingEnergy)} 虹能</strong>`;
+  $('essence-direct-probability').textContent = energy.valid&&!energy.noCaptureNeeded ? percent(energy.directEssenceWeatherProbability, 2) : '—';
+  $('essence-survival-probability').textContent = energy.valid&&!energy.noCaptureNeeded ? percent(energy.survivalProb, 2) : '—';
+  $('essence-split-note').hidden = !energy.valid||!energy.noCaptureNeeded;
+  $('energy-remaining').innerHTML = !energy.valid ? '请输入两类精华的非负整数次数。' : energy.noCaptureNeeded ? '<strong>精华阶段由直出或虹能保底完成，无需捕获。</strong>' : `若精华均未直出，剩余保底 <strong>${integer.format(energy.remainingEnergy)} 虹能</strong>`;
   $('common-expected-captures').textContent = energy.valid ? `${number.format(energy.expectedCaptures)} 只` : '—';
   $('simulation-samples').textContent = !energy.valid ? 'WAITING FOR VALID INPUT' : energy.noCaptureNeeded ? 'GUARANTEED IN ESSENCE STAGE' : `${integer.format(energy.modelSamples)} SIMULATED RUNS`;
   $('simulation-expected').innerHTML = `${energy.valid ? number.format(energy.expectedCaptures) : '—'} <small>只 · 最终期望</small>`;
-  $('simulation-precision').innerHTML = !energy.valid ? '请输入有效的非负整数滋养次数。' : energy.noCaptureNeeded ? '精华直出或虹能保底，最迟第 22 次完成。<br>无需进入捕获阶段，立方支出与汇报返还均为 0。<br>精华自身成本未计入；无需捕获模拟。' : `条件 <var>K<sub>w</sub>(${integer.format(energy.remainingEnergy)})</var> = ${decimal(energy.conditionalCaptures, 4)} 只<br>精华未直出概率 ${percent(energy.survivalProb, 2)}<br>最终均值 95% 蒙特卡洛区间<br><span class="tabular">[${energy.ci95.map(v => v.toFixed(4)).join(', ')}]</span>`;
+  $('simulation-precision').innerHTML = !energy.valid ? '请输入两类精华的有效非负整数次数。' : energy.noCaptureNeeded ? '两类精华计划合计虹能已达到保底。<br>无需进入捕获阶段，立方支出与汇报返还均为0。<br>完成即停，余下计划不消耗；未指定顺序，不拆分实际使用次数或直出占比。两类精华成本未计入。' : `条件 <var>K<sub>w</sub>(${integer.format(energy.remainingEnergy)})</var> = ${decimal(energy.conditionalCaptures, 4)} 只<br>两类精华均未直出概率 ${percent(energy.survivalProb, 2)}<br>最终均值 95% 蒙特卡洛区间<br><span class="tabular">[${energy.ci95.map(v => v.toFixed(4)).join(', ')}]</span>`;
   if (energy.valid) {
-    renderMath('formula-energy-numeric', String.raw`a=${energy.effectiveEssenceCount},\quad r=\max(10\,500-480\times${energy.effectiveEssenceCount},0)=${energy.remainingEnergy},\quad s=0.97^{${energy.effectiveEssenceCount}}\approx${decimal(energy.survivalProb)}`);
-    renderMath('formula-weather-numeric', energy.noCaptureNeeded ? String.raw`n\ge22\ \Longrightarrow\ \mathbb E[N]=0\ \text{只}` : String.raw`\mathbb E[N]=${decimal(energy.survivalProb)}\times${decimal(energy.conditionalCaptures, 4)}\approx${decimal(energy.expectedCaptures, 4)}\ \text{只}`);
+    const planEnergy=energy.essenceEnergyExact??String(energy.essenceEnergy),totalCount=energy.totalEssenceCountExact??String(state.essenceCount+state.boostedEssenceCount);
+    const survival=energy.noCaptureNeeded?'':String.raw`,\quad s=0.97^{${totalCount}}\approx${decimal(energy.survivalProb)}`;
+    renderMath('formula-energy-numeric', String.raw`E=480\times${state.essenceCount}+720\times${state.boostedEssenceCount}=${planEnergy},\quad a=${totalCount},\quad r=${energy.remainingEnergy}${survival}`);
+    renderMath('formula-weather-numeric', energy.noCaptureNeeded ? String.raw`E\ge10\,500\ \Longrightarrow\ r=0,\quad\mathbb E[N]=0\ \text{只}` : String.raw`\mathbb E[N]=${decimal(energy.survivalProb)}\times${decimal(energy.conditionalCaptures, 4)}\approx${decimal(energy.expectedCaptures, 4)}\ \text{只}`);
   } else { $('formula-energy-numeric').textContent = '请输入有效的精华次数。'; $('formula-weather-numeric').textContent = '请输入有效的精华次数。'; }
 }
 
@@ -296,10 +302,10 @@ function updateDistribution(energy) {
     ['distribution-lower','distribution-upper'].forEach(id=>{$(id).disabled=true;});
     return;
   }
-  $('distribution-context').textContent=`最多先滋养${integer.format(state.essenceCount)}次；分布包含精华提前完成的0次捕获路径。捕获率与汇报设置不会改变本分布。`;
-  const key=Math.min(state.essenceCount,22);
+  $('distribution-context').textContent=`普通${integer.format(state.essenceCount)}次、虹能+50%精华${integer.format(state.boostedEssenceCount)}次，独立输入、不规定顺序；分布包含精华阶段完成的0次捕获路径。捕获率与汇报设置不会改变本分布。`;
+  const key=`${state.essenceCount}|${state.boostedEssenceCount}`;
   if(distributionState.essenceKey===key&&distributionState.data?.valid)return;
-  const data=getWeatherDistribution(state.essenceCount);
+  const data=getWeatherDistribution(state.essenceCount,{boostedEssenceCount:state.boostedEssenceCount});
   $('distribution-error').hidden=data.valid;
   $('distribution-error').textContent=data.valid?'':data.error;
   $('distribution-content').hidden=!data.valid;
@@ -317,7 +323,7 @@ function updateDistribution(energy) {
   $('distribution-quantiles').innerHTML=data.quantiles.map(q=>`<button type="button" class="luck-card" data-luck="${q.luck}" data-quantile-count="${q.n}" aria-pressed="${q.luck===50}" aria-label="查看${q.label}，截至${q.n}次成功捕获的累计概率"><span>${q.label}</span><strong>${integer.format(q.n)}<small>次</small></strong><span class="luck-definition">${q.minimum?'理论最幸运':`下尾${shortNumber.format(q.fraction*100)}%分位`}</span></button>`).join('');
   $('distribution-quantiles').querySelectorAll('[data-luck]').forEach(button=>button.addEventListener('click',()=>{distributionState.lower=0;distributionState.upper=Number(button.dataset.quantileCount);distributionState.activeLuck=Number(button.dataset.luck);updateDistributionSelection();}));
   ['distribution-lower','distribution-upper'].forEach(id=>{$(id).min='0';$(id).max=String(data.observedMax);$(id).disabled=data.observedMax===0;});
-  $('distribution-note').textContent=data.observedMax===0?'最多22次精华已保证由直出或虹能保底完成，成功捕获次数确定为0。所有幸运档位并列0次，立方支出和汇报返还均为0。':`图形只做显示分箱，区间与分位数使用完整整数分布，不插值。最大显示次数${integer.format(data.observedMax)}是模拟样本最大值，经验尾部为0不代表游戏理论保底。首抓直出解析概率与稀有事件经验频次可能因抽样误差不同。次数不包含失败投掷，不能直接除以捕获率当作立方数分位。`;
+  $('distribution-note').textContent=data.observedMax===0?'两类精华计划合计虹能达到保底，无需捕获。所有幸运档位并列0次，立方支出和汇报返还均为0。不规定顺序，因此不拆分精华直出占比及实际使用次数。':`图形只做显示分箱，区间与分位数使用完整整数分布，不插值。最大显示次数${integer.format(data.observedMax)}是模拟样本最大值，经验尾部为0不代表游戏理论保底。首抓直出解析概率与稀有事件经验频次可能因抽样误差不同。次数不包含失败投掷，不能直接除以捕获率当作立方数分位。`;
   updateDistributionSelection();
 }
 
@@ -330,7 +336,7 @@ function distributionPointerCount(event) {
 
 function update({persist=true}={}) {
   const result = currentCalculation();
-  const energy = getEnergyModel(state.essenceCount);
+  const energy = getEnergyModel(state.essenceCount,{boostedEssenceCount:state.boostedEssenceCount});
   const capture = getCaptureSettings(options()), report = getReportSettings(options());
   const target = getTargetSettings(options());
   updateTargetMode(target);
@@ -387,9 +393,10 @@ function update({persist=true}={}) {
 document.querySelectorAll('[data-weight]').forEach(input=>input.addEventListener('input',()=>{state.weights[Number(input.dataset.weight)]=input.value===''?0:Number(input.value);update();}));
 document.querySelectorAll('input[name="weight-mode"]').forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.mode=input.value;update();}}));
 function replaceWeights(weights){state.weights=weights;document.querySelectorAll('[data-weight]').forEach(input=>{input.value=String(weights[Number(input.dataset.weight)]);});update();}
-$('reset-weights').addEventListener('click',()=>{Object.assign(state,{essenceCount:0,mode:'throws',backAttackProbability:.3,levelDifference:10,reportBonusRate:.3,targetMode:'weights',baseProbability:.16,captureBonusMode:'additive',captureBonusRate:.01});syncInputValues();replaceWeights(defaultWeights());});
+$('reset-weights').addEventListener('click',()=>{Object.assign(state,{essenceCount:0,boostedEssenceCount:0,mode:'throws',backAttackProbability:.3,levelDifference:10,reportBonusRate:.3,targetMode:'weights',baseProbability:.16,captureBonusMode:'additive',captureBonusRate:.01});syncInputValues();replaceWeights(defaultWeights());});
 $('clear-weights').addEventListener('click',()=>replaceWeights(Array(15).fill(0)));
 $('essence-count').addEventListener('input',event=>{state.essenceCount=event.target.value===''?0:Number(event.target.value);update();});
+$('boosted-essence-count').addEventListener('input',event=>{state.boostedEssenceCount=event.target.value===''?0:Number(event.target.value);update();});
 function positionInput(which){
   const input=$(which==='front'?'front-percent':'back-percent');
   const raw=input.value===''?0:Number(input.value);

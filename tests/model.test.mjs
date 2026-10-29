@@ -207,10 +207,10 @@ test('essence lookup retains the default reference and matches saved estimates',
     const value = getEnergyModel(n);
     const entry = saved.estimates[n];
     assert.equal(value.valid, true);
-    assert.equal(value.expectedCaptures, entry.expectedCaptures);
+    close(value.expectedCaptures, entry.expectedCaptures);
     assert.equal(value.modelSamples, entry.samples);
-    assert.equal(value.standardError, entry.standardError);
-    assert.deepEqual(value.ci95, entry.ci95);
+    close(value.standardError, entry.standardError);
+    value.ci95.forEach((endpoint, index) => close(endpoint, entry.ci95[index]));
     assert.equal(value.essenceCount, n);
     assert.equal(value.essenceEnergy, n*480);
     assert.equal(value.remainingEnergy, Math.max(10500-n*480, 0));
@@ -321,8 +321,9 @@ test('weather model analytically combines essence survival with conditional capt
   }
   const full = getEnergyModel(22);
   const excessive = getEnergyModel(100);
-  assert.equal(excessive.effectiveEssenceCount, 22);
-  assert.equal(excessive.essenceEnergy, 10560);
+  assert.equal(excessive.effectiveEssenceCount, null);
+  assert.equal(excessive.totalEssenceCount, 100);
+  assert.equal(excessive.essenceEnergy, 48000);
   assert.equal(excessive.expectedEssenceUses, full.expectedEssenceUses);
   assert.equal(excessive.directEssenceWeatherProbability, full.directEssenceWeatherProbability);
   assert.equal(excessive.captureNeededProbability, 0);
@@ -634,4 +635,103 @@ test('combined custom bonus settings remain pure and leave weather and refund me
   assert.equal(options.captureBonusRate, .3);
   value.captureSettings.captureBonusRate = 100;
   assert.equal(calculate(undefined, 'captures', 10, options).captureBonusRate, .3);
+});
+
+test('ordinary and boosted essence counts independently select a unified 240-energy threshold', async () => {
+  const data = JSON.parse(await readFile(new URL('../data/weather-thresholds.json', import.meta.url), 'utf8'));
+  assert.equal(MODEL.boostedEssenceEnergyEach, 720);
+  for (const [u,v] of [[0,0],[0,1],[1,1],[6,10],[20,1],[2,13]]) {
+    const value = getEnergyModel(u, {boostedEssenceCount:v});
+    assert.equal(value.valid, true);
+    assert.equal(value.essenceCount, u);
+    assert.equal(value.ordinaryCount, u);
+    assert.equal(value.boostedEssenceCount, v);
+    assert.equal(value.totalEssenceCount, u+v);
+    assert.equal(value.essenceEnergy, 480*u+720*v);
+    assert.equal(value.remainingEnergy, 10500-480*u-720*v);
+    assert.equal(value.thresholdIndex, 2*u+3*v);
+    assert.equal(value.conditionalK, data.thresholds[2*u+3*v].conditionalK);
+    close(value.survivalProb, .97**(u+v));
+    close(value.expectedCaptures, .97**(u+v)*value.conditionalK);
+    close(value.expectedEssenceUses, (1-.97**(u+v))/.03);
+    assert.equal(Object.hasOwn(value,'essenceOrder'), false);
+  }
+  assert.equal(data.essenceSources.boosted.kind, 'user');
+});
+
+test('same planned energy has the same conditional capture PMF but different direct-weather survival', () => {
+  const ordinary = getEnergyModel(21);
+  const boosted = getEnergyModel(0, {boostedEssenceCount:14});
+  const mixed = getEnergyModel(6, {boostedEssenceCount:10});
+  assert.equal(ordinary.remainingEnergy, 420);
+  assert.equal(boosted.remainingEnergy, 420);
+  assert.equal(mixed.remainingEnergy, 420);
+  assert.equal(ordinary.conditionalK, boosted.conditionalK);
+  assert.equal(ordinary.conditionalK, mixed.conditionalK);
+  assert.ok(ordinary.expectedCaptures < mixed.expectedCaptures);
+  assert.ok(mixed.expectedCaptures < boosted.expectedCaptures);
+});
+
+test('energy-guaranteed mixed plans cost no cubes and do not invent actual-use or direct-weather splits', () => {
+  for (const [u,v] of [[22,0],[0,15],[7,10],[20,2]]) {
+    const energy = getEnergyModel(u, {boostedEssenceCount:v});
+    assert.equal(energy.noCaptureNeeded, true);
+    assert.equal(energy.expectedCaptures, 0);
+    assert.equal(energy.remainingEnergy, 0);
+    assert.equal(energy.captureNeededProbability, 0);
+    assert.equal(energy.survivalProb, null);
+    assert.equal(energy.directEssenceWeatherProbability, null);
+    assert.equal(energy.expectedEssenceUses, null);
+    assert.equal(energy.effectiveEssenceCount, null);
+    assert.equal(energy.thresholdIndex, null);
+    assert.equal(energy.modelSamples, 0);
+    const value = calculate(Array(15).fill(0), 'throws', u, {boostedEssenceCount:v});
+    assert.equal(value.valid, true);
+    value.results.forEach((entry) => {
+      assert.equal(entry.expectedCost, 0);
+      assert.equal(entry.expectedRefund, 0);
+      assert.equal(entry.expectedNetCost, 0);
+    });
+  }
+});
+
+test('boosted essence changes stopping counts and fees while capture settings and per-capture refund stay independent', () => {
+  const defaults = calculate(defaultWeights());
+  const boosted = calculate(defaultWeights(), 'throws', 0, {boostedEssenceCount:1});
+  assert.equal(boosted.valid, true);
+  assert.ok(boosted.expectedCaptures < defaults.expectedCaptures);
+  boosted.results.forEach((entry,index) => {
+    assert.equal(entry.p, defaults.results[index].p);
+    assert.equal(boosted.perCaptureRefund, defaults.perCaptureRefund);
+    close(entry.expectedCubes, boosted.expectedCaptures/entry.p);
+    close(entry.expectedRefund, boosted.expectedCaptures*boosted.perCaptureRefund);
+  });
+});
+
+test('invalid boosted counts are rejected and individually safe huge plans use exact guarantee arithmetic', () => {
+  for (const boostedEssenceCount of [-1,.5,NaN,Infinity,'1',null,Number.MAX_SAFE_INTEGER+1]) {
+    assert.equal(getEnergyModel(0, {boostedEssenceCount}).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 0, {boostedEssenceCount}).valid, false);
+  }
+  assert.equal(getEnergyModel(0, null).valid, false);
+  const huge = getEnergyModel(Number.MAX_SAFE_INTEGER, {boostedEssenceCount:Number.MAX_SAFE_INTEGER});
+  assert.equal(huge.valid, true);
+  assert.equal(huge.noCaptureNeeded, true);
+  assert.equal(huge.expectedCaptures, 0);
+  assert.ok(Number.isFinite(huge.totalEssenceCount));
+  assert.ok(Number.isFinite(huge.essenceEnergy));
+  assert.equal(huge.planValuesExact, false);
+  assert.equal(huge.totalEssenceCountExact, (2n*BigInt(Number.MAX_SAFE_INTEGER)).toString());
+  assert.equal(huge.essenceEnergyExact, (1200n*BigInt(Number.MAX_SAFE_INTEGER)).toString());
+});
+
+test('boosted options remain pure and ordinary-only results stay compatible', () => {
+  const options = Object.freeze({boostedEssenceCount:1,reportBonusRate:.5});
+  const first = calculate(defaultWeights(), 'captures', 2, options);
+  const again = calculate(defaultWeights(), 'captures', 2, options);
+  assert.deepEqual(first, again);
+  assert.equal(options.boostedEssenceCount, 1);
+  for (let u = 0; u <= 21; u++) {
+    assert.deepEqual(getEnergyModel(u), getEnergyModel(u, {boostedEssenceCount:0}));
+  }
 });

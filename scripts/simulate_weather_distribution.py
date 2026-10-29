@@ -26,7 +26,7 @@ TARGETS = np.array([10500-480*n for n in range(22)], dtype=np.int32)[::-1]
 SUPPORT_LIMIT = math.ceil(10500/275)*400+math.ceil(10500/1500)
 
 
-def simulate_batch(rng: np.random.Generator, size: int) -> np.ndarray:
+def simulate_batch(rng: np.random.Generator, size: int, targets: np.ndarray = TARGETS) -> np.ndarray:
     energy = np.zeros(size, dtype=np.int32)
     captures = np.zeros(size, dtype=np.int32)
     sc = np.zeros(size, dtype=np.int32)
@@ -34,7 +34,7 @@ def simulate_batch(rng: np.random.Generator, size: int) -> np.ndarray:
     st = np.zeros(size, dtype=np.int32)
     ot = np.zeros(size, dtype=np.int32)
     direct_weather = np.zeros(size, dtype=bool)
-    differences = np.zeros((TARGETS.size+1, SUPPORT_LIMIT+1), dtype=np.int64)
+    differences = np.zeros((targets.size+1, SUPPORT_LIMIT+1), dtype=np.int64)
     while True:
         ids = np.flatnonzero((energy < 10500) & ~direct_weather)
         if ids.size == 0:
@@ -68,9 +68,9 @@ def simulate_batch(rng: np.random.Generator, size: int) -> np.ndarray:
         weather = rng.random(ids.size) < .006
         direct_weather[ids[weather]] = True
 
-        lo = np.searchsorted(TARGETS, before, side='right')
-        hi = np.searchsorted(TARGETS, energy[ids], side='right')
-        hi[weather] = TARGETS.size
+        lo = np.searchsorted(targets, before, side='right')
+        hi = np.searchsorted(targets, energy[ids], side='right')
+        hi[weather] = targets.size
         crossed = hi > lo
         lo, hi = lo[crossed], hi[crossed]
         times = captures[ids[crossed]]

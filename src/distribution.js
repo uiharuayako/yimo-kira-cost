@@ -1,4 +1,5 @@
-import { WEATHER_DISTRIBUTION } from './weather-distribution-data.js';
+import { WEATHER_THRESHOLDS } from './weather-threshold-data.js';
+import { getEnergyModel } from './model.js';
 
 const LUCK_LEVELS = Object.freeze([100, 95, 80, 50, 30, 10]);
 const cache = new Map();
@@ -18,17 +19,18 @@ export function discreteQuantile(distribution, fraction) {
 }
 
 /** Unconditional successful-capture counts, including zero on essence weather. */
-export function getWeatherDistribution(essenceCount = 0) {
-  if (!Number.isSafeInteger(essenceCount) || essenceCount < 0) {
-    return { valid: false, error: '地脉精华次数必须是非负安全整数。' };
-  }
-  const n = Math.min(essenceCount, 22);
-  if (cache.has(n)) return cache.get(n);
-  const row = n < 22 ? WEATHER_DISTRIBUTION.rows.find(item => item.essenceCount === n) : null;
-  const survival = n < 22 ? .97 ** n : 0;
+export function getWeatherDistribution(essenceCount = 0, options = {}) {
+  const energy = getEnergyModel(essenceCount, options);
+  if (!energy.valid) return { valid: false, error: energy.error };
+  const key = energy.noCaptureNeeded ? 'completed' : `${energy.remainingEnergy}:${energy.totalEssenceCount}`;
+  const plan = { essenceCount, boostedEssenceCount: energy.boostedEssenceCount };
+  if (cache.has(key)) return { ...cache.get(key), ...plan };
+  const row = energy.noCaptureNeeded ? null : WEATHER_THRESHOLDS.thresholds.find(item => item.remainingEnergy === energy.remainingEnergy);
+  if (!energy.noCaptureNeeded && !row) return { valid: false, error: '缺少当前剩余虹能门槛的分布数据。' };
+  const survival = energy.noCaptureNeeded ? 0 : energy.survivalProb;
   const pmf = new Float64Array(row ? row.counts.length + 1 : 1);
   pmf[0] = 1 - survival;
-  if (row) row.counts.forEach((count, index) => { pmf[index + 1] = survival * count / WEATHER_DISTRIBUTION.samples; });
+  if (row) row.counts.forEach((count, index) => { pmf[index + 1] = survival * count / WEATHER_THRESHOLDS.samples; });
   const cdf = new Float64Array(pmf.length);
   let total = 0, mean = 0;
   for (let k = 0; k < pmf.length; k += 1) {
@@ -47,18 +49,18 @@ export function getWeatherDistribution(essenceCount = 0) {
   const standardDeviation = Math.sqrt(Math.max(0, variance));
   const distribution = {
     valid: true, error: null, metric: 'successful-captures', label: '成功捕获次数', unit: '只',
-    essenceCount: n, pmf, cdf, mean, standardDeviation,
+    ...plan, pmf, cdf, mean, standardDeviation,
     skewness: standardDeviation > 0 ? thirdMoment / standardDeviation ** 3 : 0,
-    supportMin: n > 0 ? 0 : 1,
+    supportMin: energy.noCaptureNeeded || energy.totalEssenceCount > 0 ? 0 : 1,
     observedMax: pmf.length - 1,
-    samples: row ? WEATHER_DISTRIBUTION.samples : 0,
+    samples: row ? WEATHER_THRESHOLDS.samples : 0,
     zeroCaptureProbability: pmf[0],
     firstCaptureProbability: pmf[1] ?? 0,
     firstDirectWeatherProbability: survival * (.002 + (1 - .002) * .01) * .006,
     metadata: {
       method: '500万共享事件路径的离散经验分布；精华零捕获分支解析混合',
-      seed: WEATHER_DISTRIBUTION.seed,
-      sourceUrl: WEATHER_DISTRIBUTION.sourceUrl ?? 'https://www.yimo.com/formula-multipliers',
+      seed: WEATHER_THRESHOLDS.seed,
+      sourceUrl: WEATHER_THRESHOLDS.sourceUrl ?? 'https://www.yimo.com/formula-multipliers',
       probabilitySource: '正次数概率和分位数来自模拟，零捕获概率及首抓直接天气概率解析计算。',
       maximumScope: 'observedMax是模拟样本最大值，不是游戏理论保底次数。',
       tailMass: 0,
@@ -74,7 +76,7 @@ export function getWeatherDistribution(essenceCount = 0) {
       cdfAt: cdf[count],
     };
   });
-  cache.set(n, distribution);
+  cache.set(key, distribution);
   return distribution;
 }
 

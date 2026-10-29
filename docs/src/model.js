@@ -4,7 +4,7 @@
  * not rerun or change that simulation.
  */
 
-import { WEATHER_ESTIMATES } from './weather-estimates.js?v=21e86f820207';
+import { WEATHER_THRESHOLDS } from './weather-threshold-data.js?v=c997aab634c1';
 
 function deepFreeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -38,10 +38,12 @@ export const MODEL = deepFreeze({
   targetEnergy: 10500,
   initialEnergy: 0,
   essenceEnergyEach: 480,
+  boostedEssenceEnergyEach: 720,
   essenceGuaranteeCount: 22,
-  expectedCaptures: WEATHER_ESTIMATES[0].expectedCaptures,
-  samples: WEATHER_ESTIMATES[0].samples,
-  ci95: WEATHER_ESTIMATES[0].ci95,
+  boostedEssenceGuaranteeCount: 15,
+  expectedCaptures: WEATHER_THRESHOLDS.thresholds[0].conditionalK,
+  samples: WEATHER_THRESHOLDS.thresholds[0].samples,
+  ci95: WEATHER_THRESHOLDS.thresholds[0].conditionalCi95,
   essenceDirectWeatherProbability: 0.03,
   luckyDirectWeatherProbability: 0.006,
   reportBaseCredits: 1200,
@@ -57,10 +59,11 @@ export const MODEL = deepFreeze({
   flatCaptureBonus: 0.01,
   sourceUrl: 'https://www.yimo.com/formula-multipliers',
   assumptions: [
-    '初始虹能为 0，最多先使用指定次数的地脉精华，每次获得 480 虹能；默认次数为 0，出虹天气即停止。',
+    '普通与强化地脉精华为两项独立计划次数，默认均为 0；普通每次 480 虹能，强化每次 720（+50%，由用户给定）。',
     '开始捕捉时本周普通、超级幸运一击次数及两类保底计数均为 0；不跨周。',
     '成功捕捉均符合幸运判定条件；精华自身成本不计，毛费用只计算立方支出，净费用扣除基础汇报返还。',
-    '每次精华以 3% 独立概率直接出虹天气；未直出时增加 480 虹能，累计达到 10500 同样完成，最多需要 22 次。',
+    '两类精华每次均以 3% 独立概率直接出虹天气；未直出时增加对应能量，累计达到 10500 同样完成，天气成功即停止。',
+    '不指定两类精华的使用顺序；计划总能量低于 10500 时，用全部计划均未直出的概率计算后续捕获；达到保底时捕获为 0，不拆分实际直出占比与实际精华用量。',
     '优先判定超级幸运一击；未触发超级时才判定普通幸运一击。',
     '两类保底独立累计，触发本类后仅重置本类；达到公示保底次数的当次必定触发。',
     '超级触发当次不判定普通，也不累计普通保底；官网未明确该计数细节，这是模型假设。',
@@ -97,22 +100,22 @@ export const MODEL = deepFreeze({
     },
     user: {
       kind: 'user',
-      includes: ['立方价格 3500 / 7000 / 10500', '默认 30% 背袭占比、可调', '捕获加成默认加点模式 1%（1 个百分点），可调整或切换官网相对倍率模式', '目标为出虹天气，虹能 10500 保底亦完成', '精华自身成本不计', '用户确认基础汇报返还 1200，默认加成 30%，即 1560', '单一目标模式的基础捕获率由用户输入，默认 16%'],
+      includes: ['立方价格 3500 / 7000 / 10500', '默认 30% 背袭占比、可调', '捕获加成默认加点模式 1%（1 个百分点），可调整或切换官网相对倍率模式', '目标为出虹天气，虹能 10500 保底亦完成', '强化精华每次 720 虹能（比普通 +50%）由用户给定，两类次数独立输入', '精华自身成本不计', '用户确认基础汇报返还 1200，默认加成 30%，即 1560', '单一目标模式的基础捕获率由用户输入，默认 16%'],
     },
     simulation: {
       kind: 'simulation',
       method: '500 万共享事件路径，记录各虹能门槛首次到达或 0.6% 天气直出；精华 3% 直出概率解析合并。',
-      samples: WEATHER_ESTIMATES[0].samples,
-      mean: WEATHER_ESTIMATES[0].expectedCaptures,
-      ci95: WEATHER_ESTIMATES[0].ci95,
-      essenceTable: 'data/weather-results.json：n=0..21 共用 500 万条条件捕捉路径；旧的严格虹能表仅作为历史数据保留。',
+      samples: WEATHER_THRESHOLDS.thresholds[0].samples,
+      mean: WEATHER_THRESHOLDS.thresholds[0].conditionalK,
+      ci95: WEATHER_THRESHOLDS.thresholds[0].conditionalCi95,
+      essenceTable: 'data/weather-thresholds.json：44 个剩余能量门槛共用 500 万条条件捕捉路径；原 22 档均值与整数分布完全一致。',
       uncertainty: '区间仅表示蒙特卡洛均值的抽样误差，不包含规则歧义和单次游玩的随机波动。',
     },
     assumption: {
       kind: 'assumption',
       ordinaryPityOnSuper: '暂停',
       directRainbowWeather: '每次幸运事件独立以 0.6% 直出即完成，否则增加虹能',
-      directEssenceWeather: '每次精华独立以 3% 直出即完成，否则增加 480 虹能',
+      directEssenceWeather: '两类精华每次均独立以 3% 直出即完成，否则增加 480 或 720 虹能；达到保底时不虚构使用顺序或实际消耗拆分。',
       captureModifiers: '等级差按公示倍率可调；血量、状态及其他未列修正均不额外作用。',
       reportRewards: '基础 1200 及当前加成 30% 来自用户确认；不包含其他额外汇报奖。',
     },
@@ -125,46 +128,51 @@ export function defaultWeights() {
 }
 
 // Freeze the shared lookup data. Public functions return fresh CI arrays.
-deepFreeze(WEATHER_ESTIMATES);
+deepFreeze(WEATHER_THRESHOLDS);
 
 /** The remaining stopping time starts with both weekly counts and pities at 0. */
-export function getEnergyModel(essenceCount = 0) {
-  if (!Number.isSafeInteger(essenceCount) || essenceCount < 0) {
-    return {
-      valid: false,
-      error: '地脉精华次数必须是非负安全整数。',
-      essenceCount,
-      essenceEnergy: null,
-      remainingEnergy: null,
-      expectedCaptures: null,
-      modelSamples: 0,
-      standardError: null,
-      ci95: [],
-      noCaptureNeeded: false,
-    };
+export function getEnergyModel(ordinaryCount = 0, options = {}) {
+  const boostedEssenceCount = validOptions(options) && options.boostedEssenceCount !== undefined ? options.boostedEssenceCount : 0;
+  const invalid = (error) => ({
+    valid: false, error, essenceCount: ordinaryCount, ordinaryCount, boostedEssenceCount,
+    essenceEnergy: null, remainingEnergy: null, expectedCaptures: null,
+    modelSamples: 0, standardError: null, ci95: [], noCaptureNeeded: false,
+  });
+  if (!validOptions(options)) return invalid('精华设置必须为对象。');
+  if (!Number.isSafeInteger(ordinaryCount) || ordinaryCount < 0 || !Number.isSafeInteger(boostedEssenceCount) || boostedEssenceCount < 0) {
+    return invalid('两类地脉精华次数都必须是非负安全整数。');
   }
-  const effectiveEssenceCount = Math.min(essenceCount, MODEL.essenceGuaranteeCount);
-  const entry = WEATHER_ESTIMATES[effectiveEssenceCount];
+  // BigInt preserves the exact guarantee decision even when two individually
+  // safe counts have an unsafe sum. Returned Numbers remain finite; exact
+  // decimal strings are supplied for such unusually large plans.
+  const total = BigInt(ordinaryCount)+BigInt(boostedEssenceCount);
+  const energy = BigInt(ordinaryCount)*480n+BigInt(boostedEssenceCount)*720n;
+  const noCaptureNeeded = energy >= 10500n;
+  const totalEssenceCount = Number(total);
+  const essenceEnergy = Number(energy);
+  const remainingEnergy = noCaptureNeeded ? 0 : MODEL.targetEnergy-essenceEnergy;
+  const thresholdIndex = noCaptureNeeded ? null : essenceEnergy/240;
+  const entry = noCaptureNeeded ? null : WEATHER_THRESHOLDS.thresholds[thresholdIndex];
+  const survivalProb = noCaptureNeeded ? null : .97**totalEssenceCount;
+  const conditionalK = entry?.conditionalK ?? 0;
+  const conditionalStandardError = entry?.conditionalStandardError ?? 0;
+  const conditionalCi95 = entry ? [...entry.conditionalCi95] : [0, 0];
   return {
-    valid: true,
-    error: null,
-    essenceCount,
-    effectiveEssenceCount,
-    essenceEnergy: effectiveEssenceCount * MODEL.essenceEnergyEach,
-    remainingEnergy: Math.max(0, MODEL.targetEnergy-effectiveEssenceCount*MODEL.essenceEnergyEach),
-    conditionalK: entry.conditionalK,
-    conditionalCaptures: entry.conditionalK,
-    conditionalStandardError: entry.conditionalStandardError,
-    conditionalCi95: [...entry.conditionalCi95],
-    survivalProb: entry.survivalProb,
-    captureNeededProbability: entry.captureNeededProbability,
-    directEssenceWeatherProbability: entry.directEssenceWeatherProbability,
-    expectedEssenceUses: entry.expectedEssenceUses,
-    expectedCaptures: entry.expectedCaptures,
-    modelSamples: entry.samples,
-    standardError: entry.standardError,
-    ci95: [...entry.ci95],
-    noCaptureNeeded: essenceCount >= MODEL.essenceGuaranteeCount,
+    valid: true, error: null, essenceCount: ordinaryCount, ordinaryCount, boostedEssenceCount,
+    totalEssenceCount, totalEssenceCountExact: total.toString(), essenceEnergy,
+    essenceEnergyExact: energy.toString(),
+    planValuesExact: Number.isSafeInteger(totalEssenceCount) && Number.isSafeInteger(essenceEnergy),
+    effectiveEssenceCount: noCaptureNeeded ? null : totalEssenceCount,
+    remainingEnergy, thresholdIndex, conditionalK, conditionalCaptures: conditionalK,
+    conditionalStandardError, conditionalCi95, survivalProb,
+    captureNeededProbability: noCaptureNeeded ? 0 : survivalProb,
+    directEssenceWeatherProbability: noCaptureNeeded ? null : 1-survivalProb,
+    expectedEssenceUses: noCaptureNeeded ? null : (1-survivalProb)/.03,
+    expectedCaptures: noCaptureNeeded ? 0 : survivalProb*conditionalK,
+    modelSamples: entry?.samples ?? 0,
+    standardError: noCaptureNeeded ? 0 : survivalProb*conditionalStandardError,
+    ci95: noCaptureNeeded ? [0, 0] : conditionalCi95.map((endpoint) => endpoint*survivalProb),
+    noCaptureNeeded,
   };
 }
 
@@ -229,7 +237,7 @@ const scaledInterval = (interval, coefficient) => interval.map((mean) => mean*co
  *           p = 1 / sum(alpha_i / p_i).
  */
 export function calculate(weights, mode = 'throws', essenceCount = 0, options = {}) {
-  const energy = getEnergyModel(essenceCount);
+  const energy = getEnergyModel(essenceCount, options);
   const targetSettings = getTargetSettings(options);
   const captureSettings = getCaptureSettings(options);
   const reportSettings = getReportSettings(options);
