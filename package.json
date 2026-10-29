@@ -1,0 +1,15 @@
+{
+  "name": "yimo-kira-cost",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "伊莫虹能捕捉成本计算器：权重、概率、保底与逐步公式。",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/serve.mjs",
+    "preview": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=22.12" },
+  "dependencies": { "katex": "0.19.1" }
+}
