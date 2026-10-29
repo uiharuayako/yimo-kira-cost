@@ -14,11 +14,14 @@ Chinese probability calculator with an editorial, calm scientific character. Use
 ## Interaction and accessibility
 
 - Recalculate on every weight change; weights normalize internally. Distinguish target mix per throw from composition of successful catches.
-- An integer essence count defaults to zero; show 480n energy progress, the remaining target and the explicit scope of cube expenses only. Look up stopping times for each remaining target rather than scaling the baseline linearly.
-- At 22 or more essence uses, show the reached target, zero required catches and zero cube expenses. Handle this independently of empty weights, and never divide bar widths by zero.
+- The goal is a rainbow weather event, reached through essence 3% direct weather, lucky-event 0.6% direct weather, or 10,500 energy guarantee. Stop immediately on any completion path.
+- An integer essence limit defaults to zero. Show effective maximum a=min(n,22), survival probability .97^a, direct weather probability, conditional energy progress and conditional capture mean, plus the final unconditional capture mean. Use the weather lookup for every remaining target; do not scale the baseline linearly.
+- At an essence limit of at least 22, show zero required catches, zero cube expenses and zero reporting refunds. Handle this independently of empty weights, and never divide bar widths by zero.
+- Complementary front/back percentages default to 70/30, with integer level difference defaulting to 10 and allowing negatives. All rate formulas reflect the actual input and the official level bands.
+- Main amounts are net costs: cube expenses minus basic reporting refunds. The user-confirmed base is 1,200 credits per successful catch, with adjustable bonus defaulting to 30% (1,560 credits). Show both gross expenses and refunds. Negative net cost is explicitly labeled expected net income and plotted left of a fixed zero axis.
 - All-zero and invalid weights clear computed values, show a local alert and preserve input editing.
-- Restore defaults resets essence count, weighting mode and weights; clear only removes weights and preserves the essence count.
-- Store essence count, weights and mode locally with guarded storage calls; unavailable or corrupt storage never blocks calculation.
+- Restore defaults resets essence count, front/back split, level difference, reporting bonus, weighting mode and weights; clear only removes weights and preserves the other settings.
+- Store all numeric settings, weights and mode locally with guarded storage calls; old saved states use safe defaults for missing fields. Unavailable or corrupt storage never blocks calculation.
 - Local KaTeX produces math with MathML accessibility output. Dynamic substitutions update with inputs and selected explanation target/cube.
 - Motion is limited to brief bar transitions; honor reduced-motion preferences. No decorative continuous motion.
 - Source rules and modeling assumptions remain readable without JavaScript.

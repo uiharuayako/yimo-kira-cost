@@ -1,5 +1,7 @@
 {
   "schemaVersion": 1,
+  "currentModel": false,
+  "modelScope": "Historical strict-energy-only estimate; all direct-weather successes ignored. Not used by the current weather calculator.",
   "kind": "simulation",
   "method": "Event-jump Monte Carlo, combining two independent implementations",
   "expectedCaptures": 2797.7761872,

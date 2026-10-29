@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#f7f6f0">
-  <meta name="description" content="伊莫虹能期望花费计算器：按15种捕捉对象权重，对比谜立方、超级立方与究极立方达到10500虹能的期望金币成本，查看完整公式与数据来源。">
-  <title>伊莫虹能计算器 · YIMO / KIRA LAB</title>
+  <meta name="description" content="伊莫虹天气净花费计算器：调整捕捉对象、正背比例、等级差、精华次数与汇报加成，对比三种立方的支出、返还与净花费，查看完整公式及来源。">
+  <title>伊莫虹天气计算器 · YIMO / KIRA LAB</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./vendor/katex/katex.min.css">
   <link rel="stylesheet" href="./src/styles.css">
@@ -13,7 +13,7 @@
 <body>
   <a class="skip-link" href="#calculator">跳转到计算器</a>
   <header class="site-header shell">
-    <a class="brand" href="#" aria-label="伊莫虹能计算器首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>YIMO <span class="brand-slash">/</span> KIRA LAB</span></a>
+    <a class="brand" href="#" aria-label="伊莫虹天气计算器首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>YIMO <span class="brand-slash">/</span> KIRA LAB</span></a>
     <nav aria-label="主导航"><a href="#calculator">计算器</a><a href="#method">计算过程</a><a href="#sources">数据来源 <span aria-hidden="true">↗</span></a></nav>
   </header>
 
@@ -21,8 +21,8 @@
     <section class="hero shell" aria-labelledby="page-title">
       <div class="hero-copy">
         <p class="eyebrow"><span class="tiny-line"></span> A LITTLE LUCK, A LITTLE MATH</p>
-        <h1 id="page-title">攒满虹能，<br>要花多少<span class="title-emphasis">金币</span>？</h1>
-        <p class="hero-description">从一次捕获，到 <strong>10,500 虹能</strong>。<br>算清三种立方的花费，精华成本不计入。</p>
+        <h1 id="page-title">一场虹天气，<br>净花多少<span class="title-emphasis">金币</span>？</h1>
+        <p class="hero-description">精华直出、幸运直出、满虹能保底，<strong>任一路径出天气即完成</strong>。<br>算清立方支出与基础汇报返还，精华成本未计入。</p>
         <div class="hero-actions"><a class="button button-dark" href="#calculator">开始计算 <span aria-hidden="true">↗</span></a><a class="text-link" href="#method">看看怎么算 <span aria-hidden="true">↓</span></a></div>
         <div class="hero-tags"><span>本周从 0 次开始</span><span>普通伊莫 · 战斗外</span><span>最终 +1 个百分点</span></div>
       </div>
@@ -46,23 +46,32 @@
           <circle cx="386" cy="231" r="4" fill="#d1c1e1"/><circle cx="55" cy="180" r="3" fill="#e4ca9f"/>
         </svg>
         <div class="art-note art-note-top"><span class="note-dot"></span> THE RAINBOW EQUATION</div>
-        <div class="art-target"><span>TARGET / 目标虹能</span><strong>10,500<span>kira</span></strong></div>
-        <span class="art-coordinate">30% BACK / 70% FRONT</span>
+        <div class="art-target"><span>GUARANTEE / 虹能保底</span><strong>10,500<span>kira</span></strong></div>
+        <span class="art-coordinate" id="art-position-note">30% BACK / 70% FRONT</span>
       </div>
     </section>
 
-    <div class="conditions-wrap"><div class="conditions shell"><span class="condition-label">本次计算条件</span><span><i></i>等级差 ≤10</span><span><i></i>正面 70% / 背面 30%</span><span><i></i>状态系数 1</span><span><i></i>滋养次数可调 · 默认 0</span></div></div>
+    <div class="conditions-wrap"><div class="conditions shell"><span class="condition-label">本次计算条件</span><span><i></i><span id="condition-level">等级差 10 · 系数 ×1</span></span><span><i></i><span id="condition-position">正面 70% / 背面 30%</span></span><span><i></i>状态系数 1</span><span><i></i>出虹天气即完成</span></div></div>
 
     <section id="calculator" class="calculator-section shell" aria-labelledby="calculator-title">
       <div class="section-heading"><div><p class="eyebrow">01 / YOUR CAPTURE MIX</p><h2 id="calculator-title">先决定，这一周抓什么。</h2></div><p>填入各类伊莫的相对权重，<br>让计算贴近你的捕捉路线。</p></div>
+      <div class="capture-settings panel">
+        <div class="settings-grid">
+          <section class="setting-group" aria-labelledby="position-heading"><div class="setting-title"><h3 id="position-heading">正面 / 背面配比</h3><span class="source-badge user">用户输入</span></div><div class="position-inputs"><label for="front-percent">正面<span class="percent-input"><input id="front-percent" type="number" min="0" max="100" step="any" inputmode="decimal" value="70"><span>%</span></span></label><span class="setting-plus" aria-hidden="true">+</span><label for="back-percent">背面<span class="percent-input"><input id="back-percent" type="number" min="0" max="100" step="any" inputmode="decimal" value="30"><span>%</span></span></label></div><p class="setting-help">编辑一项，另一项自动互补，始终合计 100%。</p></section>
+          <section class="setting-group" aria-labelledby="level-heading"><div class="setting-title"><h3 id="level-heading">捕捉等级差</h3><span class="source-badge official">官网系数</span></div><div class="level-input-row"><label for="level-difference" class="sr-only">伊莫等级减联结者等级</label><input id="level-difference" type="number" step="1" value="10" aria-describedby="level-help"><span id="level-multiplier" class="level-multiplier">当前系数 ×1</span></div><p id="level-help" class="setting-help">伊莫等级 − 联结者等级；填整数，允许负数。</p><div class="level-bands" aria-label="官网等级系数表"><span>≤10 <strong>×1</strong></span><span>11 <strong>×0.8</strong></span><span>12 <strong>×0.6</strong></span><span>13 <strong>×0.4</strong></span><span>14 <strong>×0.2</strong></span><span>≥15 <strong>×0.1</strong></span></div></section>
+          <section class="setting-group" aria-labelledby="report-heading"><div class="setting-title"><h3 id="report-heading">汇报金币加成</h3><span class="source-badge user">用户确认</span></div><label for="report-bonus" class="sr-only">汇报金币加成百分比</label><div class="report-input-row"><span class="percent-input"><input id="report-bonus" type="number" min="0" step="any" inputmode="decimal" value="30"><span>%</span></span><span class="report-per-capture" id="report-per-capture">每只实收 1,560 金币</span></div><p class="setting-help">基础 1,200 ×（1 + 加成）。仅计基础汇报，不含资质、幽黯等额外奖励。</p></section>
+        </div>
+        <div id="settings-error" class="input-error" role="alert" hidden></div>
+      </div>
       <div class="calculator-layout">
         <div class="input-panel panel">
           <div class="essence-section">
-            <div class="essence-heading"><label for="essence-count">地脉精华滋养次数</label><span class="source-badge official">每次 +480 虹能</span></div>
-            <div class="essence-input-row"><div class="essence-count-wrap"><input type="number" id="essence-count" min="0" step="1" inputmode="numeric" value="0" aria-describedby="essence-help"><span>次</span></div><p id="essence-help">先使用精华，再开始捕获。<br><strong>只计算立方费用，精华成本未计入。</strong></p></div>
-            <div class="energy-labels"><span>精华提供虹能 <strong id="essence-energy">0</strong></span><span>目标 <strong>10,500</strong></span></div>
+            <div class="essence-heading"><label for="essence-count">最多地脉精华滋养次数</label><span class="source-badge official">3% 直出</span></div>
+            <div class="essence-input-row"><div class="essence-count-wrap"><input type="number" id="essence-count" min="0" step="1" inputmode="numeric" value="0" aria-describedby="essence-help"><span>次</span></div><p id="essence-help">每次 3% 直接出天气，未出则 +480 虹能；出天气即停。<br><strong>精华自身成本未计入。</strong></p></div>
+            <div class="essence-chances"><span>精华提前直出 <strong id="essence-direct-probability">0%</strong></span><span>未提前直出 <strong id="essence-survival-probability">100%</strong></span></div>
+            <div class="energy-labels"><span>未直出时虹能 <strong id="essence-energy">0</strong></span><span>保底 <strong>10,500</strong></span></div>
             <div class="energy-progress" id="essence-progress" role="progressbar" aria-label="地脉精华提供的虹能进度" aria-valuemin="0" aria-valuemax="10500" aria-valuenow="0"><span id="essence-progress-fill"></span></div>
-            <p class="energy-remaining" id="energy-remaining">剩余需捕获获得 <strong>10,500 虹能</strong></p>
+            <p class="energy-remaining" id="energy-remaining">若精华未直出，剩余保底 <strong>10,500 虹能</strong></p>
             <div id="essence-error" class="input-error" role="alert" hidden></div>
           </div>
           <div class="panel-heading"><h3>捕捉对象配比</h3><span class="source-badge user">用户输入</span></div>
@@ -75,25 +84,26 @@
           <p class="small-note"><span class="note-square"></span>可填 1、2、3 等相对权重，也可填百分比。默认仅捕捉后期区域·成熟期。</p>
         </div>
         <div class="results-panel" aria-labelledby="results-title">
-          <div class="results-heading"><div><p class="eyebrow">EXPECTED CUBE COST</p><h3 id="results-title">三种立方，一眼比较。</h3></div><span class="unit-tag">单位：万金币 · 仅立方</span></div>
+          <div class="results-heading"><div><p class="eyebrow">EXPECTED NET COST</p><h3 id="results-title">三种立方，比较净花费。</h3></div><span class="unit-tag">单位：万金币</span></div>
           <p id="mix-summary" class="mix-summary">后期区域 · 成熟期 100%</p>
           <div id="result-cards" class="result-cards" aria-live="polite" aria-atomic="true"></div>
-          <div class="result-footnote"><span class="live-dot"></span><span>剩余虹能所需的成功捕获次数期望：<strong id="common-expected-captures">2,797.8 只</strong><br><small>立方仅影响捕获成本，不改变成功捕获后的幸运判定。</small></span></div>
+          <div class="result-footnote"><span class="live-dot"></span><span>含精华直出的最终成功捕获次数期望：<strong id="common-expected-captures">—</strong><br><small>净花费 = 立方支出 − 基础汇报返还；精华成本未计入。</small></span></div>
         </div>
       </div>
     </section>
 
     <section id="method" class="method-section" aria-labelledby="method-title"><div class="shell">
-      <div class="section-heading"><div><p class="eyebrow">02 / BEHIND THE NUMBERS</p><h2 id="method-title">每一步，都算得明白。</h2></div><p>捕获率 → 虹能停止次数 → 金币<br>公式、代入与来源，一起展开。</p></div>
+      <div class="section-heading"><div><p class="eyebrow">02 / BEHIND THE NUMBERS</p><h2 id="method-title">每一步，都算得明白。</h2></div><p>捕获率 → 出天气停止次数 → 净花费<br>公式、代入与来源，一起展开。</p></div>
       <div class="explain-controls"><span>查看一次具体计算</span><label><span class="sr-only">选择立方</span><select id="explain-cube"></select></label><label><span class="sr-only">选择伊莫区域与成长阶段</span><select id="explain-target"></select></label></div>
 
       <article class="method-card">
         <div class="method-number"><span>01</span><small>CAPTURE</small></div>
         <div class="method-content"><div class="method-title"><h3>从基础概率，算出真实捕获率。</h3><div class="badge-group"><span class="source-badge official">官网公示</span><span class="source-badge user">用户给定</span><span class="source-badge assumption">建模假设</span></div></div>
           <div id="capture-flow" class="capture-flow"></div>
-          <div class="formula-block"><div id="formula-capture" class="math-equation"></div><p>先对每个正面、背面分支分别封顶到 100%，再按 70% / 30% 加权。</p><div id="formula-capture-numeric" class="math-equation numeric"></div></div>
+          <div class="formula-block"><div id="formula-capture" class="math-equation"></div><p id="capture-branch-description">先对每个正面、背面分支分别封顶到 100%，再按当前正背比例加权。</p><div id="formula-capture-numeric" class="math-equation numeric"></div></div>
           <dl class="symbol-grid"><div><dt><var>b<sub>i</sub></var> · 基础捕获率</dt><dd>第 i 类普通伊莫的官网概率，无单位；由区域和成长阶段决定。</dd></div><div><dt><var>m</var> · 立方倍率</dt><dd>谜立方 1、超级 1.5、究极 2；无单位，来自官网。</dd></div><div><dt><var>δ</var> · 最终加算</dt><dd>0.01，即额外 1 个百分点；由用户指定，在乘法完成后加入。</dd></div><div><dt><var>p<sub>i,m</sub></var> · 单类捕获率</dt><dd>第 i 类目标使用该立方时，每次投掷成功的概率，无单位。</dd></div></dl>
-          <div class="inline-note">1.5 是官网背袭倍率；0.7 / 0.3 是用户给定的正面 / 背面占比。等级差 ≤10，等级系数为 1；状态系数假定为 1。全部在战斗外，因此满血不乘战斗内的 0.8 系数。</div>
+          <dl class="symbol-grid"><div><dt><var>β</var> · 背面占比</dt><dd>由上方百分比输入决定的概率，无单位；正面占比为 1−β。默认 β=0.3，可调。</dd></div><div><dt><var>Δ</var> / <var>L(Δ)</var> · 等级差 / 系数</dt><dd>Δ = 伊莫等级 − 联结者等级，单位“级”，可为负整数；L 按上方官网分档表取值，无单位。</dd></div></dl>
+          <div class="inline-note" id="capture-assumptions">1.5 是官网背袭倍率；正背比例与等级差可调，当前值参与所有计算。状态系数假定为 1。全部在战斗外，因此满血不乘战斗内的 0.8 系数。</div>
           <div class="formula-block mix-formula"><h4>再把 15 类目标，合成这条路线的捕获率。</h4><div id="formula-weights" class="math-equation"></div><div id="formula-mix" class="math-equation"></div><p id="mix-formula-description"></p><div id="formula-mix-numeric" class="math-equation numeric"></div></div>
           <dl class="symbol-grid compact"><div><dt><var>w<sub>i</sub></var> / <var>α<sub>i</sub></var></dt><dd>输入的非负相对权重 / 归一化占比；均无单位。</dd></div><div><dt><var>P<sub>m</sub></var> · 折算捕获率</dt><dd>该立方在当前配比下的每次投掷成功率；成功构成模式下是每次成功平均用球数的倒数。</dd></div></dl>
         </div>
@@ -101,28 +111,34 @@
 
       <article class="method-card">
         <div class="method-number teal"><span>02</span><small>KIRA</small></div>
-        <div class="method-content"><div class="method-title"><h3>幸运会变化，所以逐次累计虹能。</h3><div class="badge-group"><span class="source-badge official">官网公示</span><span class="source-badge simulation">模拟结果</span></div></div>
-          <div class="lucky-flow"><div><span class="flow-kicker">每次成功捕获</span><strong>先判超级幸运</strong><small>触发 → +1,500 虹能</small></div><span class="flow-arrow" aria-hidden="true">→</span><div><span class="flow-kicker">超级未触发时</span><strong>再判普通幸运</strong><small>触发 → 随机获得虹能</small></div></div>
-          <div class="rule-table-wrap"><table class="rule-table"><caption>幸运判定参数 · 来自官网概率公示</caption><thead><tr><th scope="col">幸运类型 / 本周档位</th><th scope="col">触发率</th><th scope="col">保底</th><th scope="col">虹能奖励</th></tr></thead><tbody><tr><th scope="row">普通 · 前 10 次</th><td>1%</td><td>200 次</td><td rowspan="2">275 / 300 / 350 / 500<br><small>概率 40% / 50% / 5% / 5%</small></td></tr><tr><th scope="row">普通 · 第 11 次起</th><td>0.5%</td><td>400 次</td></tr><tr><th scope="row">超级 · 第 1 次</th><td>0.2%</td><td>500 次</td><td rowspan="3">1,500<br><small>概率 100%</small></td></tr><tr><th scope="row">超级 · 第 2 次</th><td>0.1%</td><td>1,000 次</td></tr><tr><th scope="row">超级 · 第 3 次起</th><td>0.05%</td><td>3,000 次</td></tr></tbody></table></div>
-          <div class="formula-block"><div id="formula-energy" class="math-equation"></div><div id="formula-energy-numeric" class="math-equation numeric"></div><p><var>n</var> 是先使用地脉精华的滋养次数，单位“次”，必须为非负整数；480 是官网公示的每次滋养虹能奖励，单位“虹能 / 次”；<var>r</var> 是扣除精华奖励后仍需通过捕获积累的虹能。n ≥22 时，r=0，无需捕获，立方花费为 0。精华自身成本不计入。</p><div id="formula-stop" class="math-equation"></div><p><var>R<sub>t</sub></var> 是第 t 次成功捕获产生的虹能，单位“虹能”；<var>N</var> 是首次累计达到剩余目标 r 所需的成功捕获只数；<var>K(r)</var> 是 N 的期望，单位“只”。每周概率、双保底和终点超额使整体过程不能直接用固定速率相除；对每个剩余目标分别统计停止次数，不能将零精华结果按剩余虹能线性缩放。</p><div id="formula-reward" class="math-equation"></div><p>上式为普通幸运单次奖励的均值，单位“虹能 / 次普通幸运”，奖励及概率来自官网。</p><div id="formula-geometric" class="math-equation"></div><p><var>q</var> 是当前档位的单次触发概率，无单位；<var>H</var> 是该档位的保底次数；<var>G</var> 是自然触发所需的有效判定次数，取值从 1 开始；<var>T</var> 是加入保底后的等待次数。例如普通前 10 次取 q=0.01、H=200，单一时钟的平均等待为 86.602 次有效判定。两类时钟按超级优先规则耦合，最终 K(r) 由完整过程模拟得到。</p></div>
-          <div class="simulation-result"><div><span class="eyebrow" id="simulation-samples">15,000,000 SIMULATED RUNS</span><strong id="simulation-expected">2,797.8 <small>只成功捕获</small></strong></div><p id="simulation-precision">估计 <var>K(10,500)</var> = 2,797.7761872 只<br>均值的 95% 蒙特卡洛置信区间<br><span class="tabular">[2,797.4569, 2,798.0955]</span></p></div>
-          <p class="small-note">这个区间描述模拟对“平均次数”的估计精度，<strong>不是单个玩家的 95% 捕捉次数或预算范围</strong>。计算不模拟投球失败，只模拟成功捕获之后的幸运事件。</p>
+        <div class="method-content"><div class="method-title"><h3>出虹天气就停，保底也是一条路径。</h3><div class="badge-group"><span class="source-badge official">官网公示</span><span class="source-badge simulation">模拟结果</span></div></div>
+          <div class="weather-paths"><div><span>精华阶段</span><strong>每次 3% 直出</strong><p>未直出则 +480 虹能；出天气或满虹能即停。</p></div><div><span>幸运事件</span><strong>每次事件 0.6% 直出</strong><p>只在普通 / 超级幸运触发后判定，非每次捕获判定。</p></div><div><span>虹能保底</span><strong>累计 ≥10,500</strong><p>达到保底同样完成，无需等待直接天气。</p></div></div>
+          <div class="lucky-flow"><div><span class="flow-kicker">每次成功捕获</span><strong>先判超级幸运</strong><small>触发后：0.6% 出天气；否则 +1,500 虹能。</small></div><span class="flow-arrow" aria-hidden="true">→</span><div><span class="flow-kicker">超级未触发时</span><strong>再判普通幸运</strong><small>触发后：0.6% 出天气；否则随机获得虹能。</small></div></div>
+          <div class="rule-table-wrap"><table class="rule-table"><caption>幸运事件触发参数 · 来自官网；下列虹能奖励用于事件未直出天气的分支。</caption><thead><tr><th scope="col">幸运类型 / 本周档位</th><th scope="col">触发率</th><th scope="col">保底</th><th scope="col">未直出时虹能奖励</th></tr></thead><tbody><tr><th scope="row">普通 · 前 10 次</th><td>1%</td><td>200 次</td><td rowspan="2">275 / 300 / 350 / 500<br><small>概率 40% / 50% / 5% / 5%</small></td></tr><tr><th scope="row">普通 · 第 11 次起</th><td>0.5%</td><td>400 次</td></tr><tr><th scope="row">超级 · 第 1 次</th><td>0.2%</td><td>500 次</td><td rowspan="3">1,500<br><small>概率 100%</small></td></tr><tr><th scope="row">超级 · 第 2 次</th><td>0.1%</td><td>1,000 次</td></tr><tr><th scope="row">超级 · 第 3 次起</th><td>0.05%</td><td>3,000 次</td></tr></tbody></table></div>
+          <div class="formula-block"><h4>先尝试精华，未出天气的路径才继续捕获。</h4><div id="formula-energy" class="math-equation"></div><div id="formula-survival" class="math-equation"></div><div id="formula-energy-numeric" class="math-equation numeric"></div><p><var>n</var> 是最多先使用精华的次数，单位“次”，为非负整数；<var>a</var>=min(n,22) 是保底前最多可能使用的次数。每次精华 3% 直出天气；未直出时获得官网公示的 480 虹能 / 次。<var>s</var> 是这 a 次都未直出的概率；<var>r</var> 是这一条件下的剩余保底虹能。最多 22 次即可由直出或虹能保底完成，不一定会使用满 n 次。</p><div id="formula-stop" class="math-equation"></div><div id="formula-weather-mean" class="math-equation"></div><p><var>W<sub>t</sub></var> 表示第 t 次成功捕获后，触发的幸运事件是否直接出天气；每次普通或超级幸运事件只判定一次 0.6%。<var>R<sub>t</sub></var> 是该次成功捕获获得的虹能。<var>N<sub>w</sub>(r)</var> 是开始捕获后，首次直接出天气或满虹能保底所需的成功捕获只数；<var>K<sub>w</sub>(r)</var> 是它的条件期望，单位“只”。最终 <var>E[N]</var> 把精华已直出的零捕获路径一起计入，故 n&lt;22 时为 s×K<sub>w</sub>(r)，n≥22 时为 0。</p><div id="formula-weather-numeric" class="math-equation numeric"></div><div id="formula-reward" class="math-equation"></div><p>普通幸运未直出天气时，每次奖励的均值为 302.5 虹能。每周概率、独立保底及提前停止使过程不能按剩余虹能线性缩放；本模型对各剩余目标分别统计天气停止次数。</p><div id="formula-geometric" class="math-equation"></div><p><var>q</var> 是当前幸运档位的触发概率；<var>H</var> 是该档位的保底次数；<var>G</var> 是自然触发所需有效判定次数，从 1 开始；<var>T</var> 是加入保底后的等待次数。两个幸运时钟按超级优先规则耦合，天气停止则由完整过程模拟统计。</p></div>
+          <div class="simulation-result"><div><span class="eyebrow" id="simulation-samples">5,000,000 SIMULATED RUNS</span><strong id="simulation-expected">— <small>只 · 最终期望</small></strong></div><p id="simulation-precision">按当前精华次数查表计算。</p></div>
+          <p class="small-note">均值的 95% 蒙特卡洛区间描述模拟对“平均次数”的估计精度，<strong>不是单个玩家的 95% 捕捉次数或预算范围</strong>。500 万条捕获路径共享用于各剩余门槛，精华 3% 直出概率以解析公式合并。</p>
         </div>
       </article>
 
       <article class="method-card">
         <div class="method-number orange"><span>03</span><small>GOLD</small></div>
-        <div class="method-content"><div class="method-title"><h3>把成功捕获，换算成球数和金币。</h3><div class="badge-group"><span class="source-badge user">用户给定</span><span class="source-badge simulation">模拟结果</span></div></div>
-          <div class="formula-block"><div id="formula-cost" class="math-equation"></div><div id="formula-cost-numeric" class="math-equation numeric"></div></div>
-          <dl class="symbol-grid"><div><dt><var>B<sub>m</sub></var> · 消耗立方数</dt><dd>达到目标所消耗的立方数量，单位“个”；E[·] 表示期望。每次投掷消耗 1 个立方，包含失败消耗。</dd></div><div><dt><var>c<sub>m</sub></var> · 单价</dt><dd>谜立方 3,500、超级 7,000、究极 10,500 金币 / 个，均由用户提供。精华成本未计入。</dd></div><div><dt><var>C<sub>m</sub></var> · 立方金币花费</dt><dd>立方数量 × 单价，单位“金币”；结果图除以 10,000，以“万金币”展示。</dd></div><div><dt><var>K(r)</var> / <var>P<sub>m</sub></var></dt><dd>剩余目标 r 对应的成功捕获期望 / 当前配比折算捕获率。捕获和幸运事件视为相互独立。</dd></div></dl>
+        <div class="method-content"><div class="method-title"><h3>支出减去汇报返还，得到净花费。</h3><div class="badge-group"><span class="source-badge user">用户给定</span><span class="source-badge simulation">模拟结果</span></div></div>
+          <div class="formula-block"><div id="formula-cost" class="math-equation"></div><div id="formula-refund" class="math-equation"></div><div id="formula-net" class="math-equation"></div><div id="formula-cost-numeric" class="math-equation numeric"></div></div>
+          <dl class="symbol-grid"><div><dt><var>B<sub>m</sub></var> / <var>c<sub>m</sub></var></dt><dd>消耗立方数，单位“个” / 立方单价，单位“金币 / 个”。单价 3,500、7,000、10,500 来自用户；每次投掷消耗 1 个立方，包含失败消耗。</dd></div><div><dt><var>C<sub>gross,m</sub></var> / <var>C<sub>net,m</sub></var></dt><dd>立方支出 / 扣除基础汇报返还后的净花费，单位“金币”。结果图以“万金币”显示；净花费为负时显示为预计净收益。精华成本未计入。</dd></div><div><dt><var>F</var> / <var>γ</var> · 汇报返还 / 加成</dt><dd>F 是完成目标期间所有成功捕获的基础汇报返还总额，单位“金币”。每只基础汇报 1,200 金币由用户确认；γ为可调的汇报金币加成，无单位，默认 0.3。每只实收=1,200×(1+γ)，默认 1,560 金币；不计资质、幽黯等奖励。</dd></div><div><dt><var>E[N]</var> / <var>P<sub>m</sub></var></dt><dd>含精华直出的最终成功捕获次数期望 / 当前配比折算捕获率。所有成功捕获均提交汇报，包含触发天气的最后一次；捕获成败与后续幸运事件视为独立。</dd></div></dl>
         </div>
       </article>
     </div></section>
 
     <section id="sources" class="sources-section shell" aria-labelledby="sources-title">
       <div class="section-heading"><div><p class="eyebrow">03 / OPEN NOTES</p><h2 id="sources-title">数字有出处，假设也透明。</h2></div><a class="text-link" href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">阅读官网概率公示 <span aria-hidden="true">↗</span></a></div>
-      <div class="sources-grid"><article class="source-card"><span class="source-badge official">官网公示</span><h3>游戏公布的规则</h3><p>15 类基础捕捉率、三种立方倍率、背袭 ×1.5、等级差 ≤10 的系数，以及幸运概率、保底次数、虹能奖励和判定顺序；每次地脉精华滋养 +480 虹能、3% 直接虹天气。</p><a href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">《伊莫》概率公示 ↗</a><small>规则核对：2026-10-30</small></article><article class="source-card"><span class="source-badge user">用户给定</span><h3>这次计算的边界</h3><p>三种立方单价 3,500 / 7,000 / 10,500 金币；正面 70%、背面 30%；额外 1 个百分点在最终概率上加算；全部战斗外、满血、等级差 ≤10；地脉精华次数默认 0，可调，且只计算立方费用。</p><small>配比由上方权重自由设置。</small></article><article class="source-card"><span class="source-badge simulation">模拟结果</span><h3>不同剩余目标，分别统计</h3><p>零次滋养采用 1,500 万条完整模拟路径；非零滋养的各剩余目标共享 500 万条额外路径，分别记录停止次数。样本数、成功捕获期望 K(r) 与均值区间随当前次数显示，再用解析公式换算立方数与金币。</p><a href="./data/model-results.json" target="_blank" rel="noopener noreferrer">零精华模型数据 ↗</a> <a href="./data/essence-results.json" target="_blank" rel="noopener noreferrer">精华目标查表 ↗</a> <a href="https://github.com/uiharuayako/yimo-kira-cost" target="_blank" rel="noopener noreferrer">查看复算代码 ↗</a><small>均值精度不等于单次游玩的风险范围。</small></article><article class="source-card assumptions"><span class="source-badge assumption">建模假设</span><h3>公示之外，明确约定</h3><ul><li>只抓普通伊莫，排除头目；所有成功捕获都符合幸运判定条件，状态系数为 1。</li><li>初始虹能、本周普通 / 超级次数、两类保底计数均为 0；先完成 n 次滋养，再开始捕获，全程不跨周。</li><li>两类保底各自累计，仅触发本类时重置；超级触发当次普通判定与普通保底计数暂停。</li><li>幸运的 0.6% 与精华滋养的 3% 直接虹天气都不提前停止，也不替代或重置本模型中的虹能奖励（含每次滋养 +480）；目标严格为累计虹能 ≥10,500。</li><li>每次投掷的正背面、捕获与后续幸运事件按所给概率独立处理。</li></ul></article></div>
-      <p class="source-footnote">官网未完整说明双保底计数的实现细节，以及直接虹天气对虹能进度的影响；本页使用以上明确约定。若实际游戏规则不同，虹能模型的期望次数需要重新计算。</p>
+      <div class="sources-grid">
+        <article class="source-card"><span class="source-badge official">官网公示</span><h3>游戏公布的规则</h3><p>15 类基础捕获率、立方倍率、背袭 ×1.5、等级差系数表，以及幸运事件触发概率、保底、虹能奖励。精华每次 3% 直接出天气，未直出时 +480 虹能；普通和超级幸运事件各有 0.6% 直接天气，虹能保底为 10,500。</p><a href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">《伊莫》概率公示 ↗</a><small>规则核对：2026-10-30</small></article>
+        <article class="source-card"><span class="source-badge user">用户给定 / 确认</span><h3>路线、价格与基础汇报</h3><p>立方单价 3,500 / 7,000 / 10,500 金币；最终概率额外加 1 个百分点；普通伊莫、全部战斗外、满血。正背比例、等级差、最多精华次数和汇报加成可调；默认正面 70%、背面 30%、等级差 10、精华 0 次、汇报加成 30%。基础汇报 1,200 金币由用户确认，默认每只 1,560 金币，并非本页引用的官网公示数据。</p><small>仅计算立方支出与基础汇报返还，不计精华自身成本及资质、幽黯等奖励。</small></article>
+        <article class="source-card"><span class="source-badge simulation">模拟结果</span><h3>500 万条天气停止路径</h3><p>按每周幸运档位、独立保底、奖励与每次幸运事件 0.6% 天气直出，记录各剩余门槛的首次完成次数。共享路径分别统计条件 K<sub>w</sub>(r)；以 0.97<sup>a</sup> 合并精华提前完成路径，得到最终 E[N]。改变正背、等级或汇报加成，不改变天气停止次数。</p><a href="./data/weather-results.json" target="_blank" rel="noopener noreferrer">天气模型查表数据 ↗</a> <a href="https://github.com/uiharuayako/yimo-kira-cost" target="_blank" rel="noopener noreferrer">查看复算代码 ↗</a><small>当前模型纳入直出天气；页面区间仅表示蒙特卡洛均值误差。</small></article>
+        <article class="source-card assumptions"><span class="source-badge assumption">建模假设</span><h3>公示之外，明确约定</h3><ul><li>只抓普通伊莫，排除头目；所有成功捕获都符合幸运判定条件，状态系数为 1。</li><li>初始虹能为 0；最多先滋养 n 次，出天气或虹能保底即停，再在未完成路径中捕获。本周两类幸运次数和保底计数从 0 开始，全程不跨周。</li><li>两类保底各自累计，仅触发本类时重置；超级触发当次普通判定与普通保底计数暂停。</li><li>精华每次 3% 直出、每次幸运事件 0.6% 直出，按独立判定处理；直出立即完成，未直出才增加相应虹能。</li><li>正背面、捕获成败与后续幸运事件按给定概率独立处理；每只成功捕获都提交基础汇报，包括触发天气的最后一只。</li></ul></article>
+      </div>
+      <p class="source-footnote">官网未完整说明双保底计数的实现细节；本页明确采用以上约定。若实际游戏中的判定条件、计数或奖励规则不同，需要重新计算。汇报基础额及加成来自用户确认，不能视为官网公示。</p>
     </section>
   </main>
   <footer class="site-footer shell"><a class="brand" href="#">YIMO <span class="brand-slash">/</span> KIRA LAB</a><p>非官方计算工具 · 期望值是长期平均，不是保底预算。</p><a href="#">回到顶部 ↑</a></footer>

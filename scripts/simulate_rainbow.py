@@ -1,4 +1,6 @@
-"""Optional offline reproduction of the rainbow-energy stopping-time estimate.
+"""Historical strict-energy-only estimate; NOT the current weather model.
+
+For the current weather goal use scripts/simulate_weather.py instead.
 
 Requires Python 3.10+ and NumPy: python -m pip install numpy
 Run from the repository root, for example:
@@ -103,6 +105,8 @@ def main() -> None:
     half_width = 1.959963984540054*standard_error
     result = {
         'schemaVersion': 1,
+        'currentModel': False,
+        'modelScope': 'Historical strict-energy-only model; direct weather ignored.',
         'kind': 'simulation',
         'method': 'Event-jump Monte Carlo',
         'samples': count,

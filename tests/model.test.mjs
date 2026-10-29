@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel } from '../src/model.js';
+import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel, getCaptureSettings, getReportSettings } from '../src/model.js';
 
 function close(actual, expected, relativeTolerance = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= relativeTolerance * Math.max(1, Math.abs(expected)), `${actual} ≈ ${expected}`);
@@ -18,17 +18,18 @@ test('complete source matrix, cube economy and fixed rainbow estimate', () => {
   assert.deepEqual(CUBES.map(({ id, price, multiplier }) => [id, price, multiplier]), [
     ['mystery',3500,1],['super',7000,1.5],['ultimate',10500,2],
   ]);
-  assert.equal(MODEL.expectedCaptures, 2797.7761872);
-  assert.equal(MODEL.samples, 15000000);
-  assert.deepEqual(MODEL.ci95, [2797.4569133,2798.0954611]);
+  assert.equal(MODEL.expectedCaptures, 2576.3470804);
+  assert.equal(MODEL.samples, 5000000);
+  assert.deepEqual(MODEL.ci95, [2575.5854908961587,2577.108669903841]);
   assert.deepEqual(Object.values(MODEL.metadata).map(({kind}) => kind), ['official','user','simulation','assumption']);
 });
 
 test('saved simulation reference agrees with the browser constants', async () => {
-  const saved = JSON.parse(await readFile(new URL('../data/model-results.json', import.meta.url), 'utf8'));
-  assert.equal(saved.expectedCaptures, MODEL.expectedCaptures);
-  assert.equal(saved.samples, MODEL.samples);
-  assert.deepEqual(saved.ci95, MODEL.ci95);
+  const saved = JSON.parse(await readFile(new URL('../data/weather-results.json', import.meta.url), 'utf8'));
+  assert.equal(saved.currentModel, true);
+  assert.equal(saved.estimates[0].expectedCaptures, MODEL.expectedCaptures);
+  assert.equal(saved.estimates[0].samples, MODEL.samples);
+  assert.deepEqual(saved.estimates[0].ci95, MODEL.ci95);
   assert.equal(saved.targetEnergy, MODEL.targetEnergy);
   assert.equal(saved.officialSource, MODEL.sourceUrl);
   assert.equal(saved.assumptions.ordinaryPityAdvancesOnSuper, false);
@@ -44,8 +45,8 @@ test('default chooses only late-region mature creatures and has independently ca
   value.results.forEach((result, index) => {
     const p = probabilities[index];
     close(result.p, p);
-    close(result.expectedCubes, 2797.7761872 / p);
-    close(result.expectedCost, 2797.7761872 * CUBES[index].price / p);
+    close(result.expectedCubes, 2576.3470804 / p);
+    close(result.expectedCost, 2576.3470804 * CUBES[index].price / p);
     close(result.costPerCapture, CUBES[index].price / p);
     assert.equal(result.frontBack.length, 15);
   });
@@ -194,7 +195,7 @@ test('400 deterministic mixed populations preserve probability, cost and orderin
 });
 
 test('essence lookup retains the default reference and matches saved estimates', async () => {
-  const saved = JSON.parse(await readFile(new URL('../data/essence-results.json', import.meta.url), 'utf8'));
+  const saved = JSON.parse(await readFile(new URL('../data/weather-results.json', import.meta.url), 'utf8'));
   assert.equal(saved.estimates.length, 23);
   assert.equal(MODEL.essenceEnergyEach, 480);
   assert.equal(MODEL.metadata.official.essence.energy, 480);
@@ -303,4 +304,142 @@ test('invalid essence counts are rejected and invalid weights stay invalid after
   const one = getEnergyModel(1);
   one.ci95[0] = 0;
   assert.ok(getEnergyModel(1).ci95[0] > 0);
+});
+
+test('weather model analytically combines essence survival with conditional capture stopping times', () => {
+  for (let n = 0; n <= 21; n++) {
+    const value = getEnergyModel(n);
+    const survival = .97**n;
+    close(value.survivalProb, survival);
+    close(value.captureNeededProbability, survival);
+    close(value.directEssenceWeatherProbability, 1-survival);
+    close(value.expectedEssenceUses, (1-survival)/.03);
+    close(value.expectedCaptures, survival*value.conditionalK);
+    close(value.standardError, survival*value.conditionalStandardError);
+    value.ci95.forEach((endpoint, index) => close(endpoint, survival*value.conditionalCi95[index]));
+    assert.equal(value.conditionalCaptures, value.conditionalK);
+  }
+  const full = getEnergyModel(22);
+  const excessive = getEnergyModel(100);
+  assert.equal(excessive.effectiveEssenceCount, 22);
+  assert.equal(excessive.essenceEnergy, 10560);
+  assert.equal(excessive.expectedEssenceUses, full.expectedEssenceUses);
+  assert.equal(excessive.directEssenceWeatherProbability, full.directEssenceWeatherProbability);
+  assert.equal(excessive.captureNeededProbability, 0);
+  assert.equal(excessive.conditionalK, 0);
+  assert.equal(excessive.expectedCaptures, 0);
+});
+
+test('strict-energy historical data are labelled and are not the weather stopping model', async () => {
+  const historical = JSON.parse(await readFile(new URL('../data/essence-results.json', import.meta.url), 'utf8'));
+  const oldDefault = JSON.parse(await readFile(new URL('../data/model-results.json', import.meta.url), 'utf8'));
+  assert.equal(historical.currentModel, false);
+  assert.equal(oldDefault.currentModel, false);
+  assert.ok(getEnergyModel(0).expectedCaptures < oldDefault.expectedCaptures);
+  for (let n = 0; n <= 21; n++) {
+    assert.ok(getEnergyModel(n).conditionalK < historical.estimates[n].expectedCaptures);
+  }
+});
+
+test('level differences use every official coefficient, including allowed negative differences', () => {
+  for (const [difference, multiplier] of [[-100,1],[0,1],[10,1],[11,.8],[12,.6],[13,.4],[14,.2],[15,.1],[100,.1]]) {
+    const settings = getCaptureSettings({levelDifference: difference});
+    assert.equal(settings.valid, true);
+    assert.equal(settings.levelMultiplier, multiplier);
+    const value = calculate(defaultWeights(), 'throws', 0, {levelDifference: difference});
+    assert.equal(value.levelMultiplier, multiplier);
+    close(value.results[0].frontBack[14].front, .16*multiplier+.01);
+    close(value.results[0].frontBack[14].back, .24*multiplier+.01);
+    assert.equal(value.expectedCaptures, MODEL.expectedCaptures);
+  }
+});
+
+test('front and back endpoints and their editable mixture apply the fixed bonus after all multipliers', () => {
+  for (const beta of [0, .3, 1]) {
+    const value = calculate(single(0), 'throws', 0, {backAttackProbability: beta, levelDifference: 11});
+    assert.equal(value.captureSettings.backAttackProbability, beta);
+    close(value.captureSettings.frontAttackProbability, 1-beta);
+    const partial = value.results[2].frontBack[0];
+    close(partial.front, .906);
+    assert.equal(partial.back, 1);
+    close(partial.p, (1-beta)*.906+beta);
+  }
+  const implicit = calculate(defaultWeights());
+  const explicit = calculate(defaultWeights(), 'throws', 0, {backAttackProbability:.3, levelDifference:10});
+  assert.deepEqual(implicit, explicit);
+});
+
+test('invalid capture options fail even when no capturing would be required', () => {
+  const invalid = [null, [], false,
+    ...[-.1,1.1,NaN,Infinity,'0.3',null].map((beta) => ({backAttackProbability: beta})),
+    ...[.5,NaN,Infinity,'10',null,Number.MAX_SAFE_INTEGER+1].map((levelDifference) => ({levelDifference})),
+  ];
+  for (const options of invalid) {
+    assert.equal(getCaptureSettings(options).valid, false);
+    assert.equal(calculate(defaultWeights(), 'throws', 0, options).valid, false);
+    assert.equal(calculate(Array(15).fill(0), 'throws', 22, options).valid, false);
+  }
+});
+
+test('reporting refunds use user-confirmed 1200 with editable 0, 30% and 100% bonuses', () => {
+  for (const bonus of [0,.3,1]) {
+    const settings = getReportSettings({reportBonusRate: bonus});
+    assert.equal(settings.valid, true);
+    close(settings.perCaptureRefund, 1200*(1+bonus));
+    const value = calculate(defaultWeights(), 'throws', 0, {reportBonusRate: bonus});
+    assert.equal(value.expectedCaptures, MODEL.expectedCaptures);
+    assert.equal(value.perCaptureRefund, settings.perCaptureRefund);
+    close(value.expectedRefund, MODEL.expectedCaptures*settings.perCaptureRefund);
+    value.results.forEach((entry) => {
+      close(entry.expectedRefund, value.expectedRefund);
+      close(entry.expectedNetCost, entry.expectedCost-entry.expectedRefund);
+      close(entry.expectedRefundCi95[0], value.ci95[0]*settings.perCaptureRefund);
+      assert.ok(entry.expectedNetCostCi95[0] <= entry.expectedNetCost);
+      assert.ok(entry.expectedNetCost <= entry.expectedNetCostCi95[1]);
+    });
+    assert.equal(value.bestId, 'mystery');
+  }
+  assert.equal(getReportSettings().perCaptureRefund, 1560);
+});
+
+test('negative net cost is allowed and its confidence interval endpoints remain sorted', () => {
+  const value = calculate(single(0), 'throws', 0, {reportBonusRate:100});
+  assert.equal(value.valid, true);
+  for (const entry of value.results) {
+    assert.ok(entry.expectedNetCost < 0);
+    assert.ok(entry.expectedNetCostCi95[0] < entry.expectedNetCostCi95[1]);
+    assert.ok(entry.expectedNetCostCi95[0] < entry.expectedNetCost);
+    assert.ok(entry.expectedNetCost < entry.expectedNetCostCi95[1]);
+    close(entry.expectedNetCostCi95[0], value.ci95[1]*(entry.costPerCapture-value.perCaptureRefund));
+  }
+});
+
+test('invalid report bonuses fail and no captures means no refunds or net expenditure', () => {
+  for (const bonus of [-.1,NaN,Infinity,-Infinity,'0.3',null,Number.MAX_VALUE]) {
+    const options = {reportBonusRate:bonus};
+    assert.equal(calculate(defaultWeights(), 'throws', 0, options).valid, false);
+  }
+  const value = calculate(Array(15).fill(0), 'captures', 22, {reportBonusRate:1});
+  assert.equal(value.valid, true);
+  assert.equal(value.expectedRefund, 0);
+  for (const entry of value.results) {
+    assert.equal(entry.expectedRefund, 0);
+    assert.equal(entry.expectedNetCost, 0);
+    assert.deepEqual(entry.expectedRefundCi95, [0,0]);
+    assert.deepEqual(entry.expectedNetCostCi95, [0,0]);
+  }
+});
+
+test('capture and reporting options are not mutated and do not change the weather simulation', () => {
+  const options = Object.freeze({backAttackProbability:.7,levelDifference:14,reportBonusRate:.75});
+  const before = {...options};
+  const first = calculate(defaultWeights(), 'captures', 8, options);
+  const second = calculate(defaultWeights(), 'captures', 8);
+  assert.deepEqual(options, before);
+  assert.equal(first.expectedCaptures, second.expectedCaptures);
+  assert.equal(first.modelSamples, second.modelSamples);
+  assert.deepEqual(first.ci95, second.ci95);
+  first.captureSettings.levelMultiplier = 100;
+  first.reportSettings.perCaptureRefund = 0;
+  assert.equal(calculate(defaultWeights(), 'captures', 8, options).levelMultiplier, .2);
 });

@@ -1,5 +1,7 @@
 {
   "schemaVersion": 1,
+  "currentModel": false,
+  "modelScope": "Historical strict-energy-only essence table; direct-weather successes ignored. Not used by the current weather calculator.",
   "method": "Shared-path event-jump Monte Carlo with exact first crossings of all remaining-energy thresholds",
   "samplesPerNonzeroEssenceCount": 5000000,
   "seed": 2026103031,
