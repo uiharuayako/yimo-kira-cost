@@ -14,7 +14,7 @@
   <a class="skip-link" href="#calculator">跳转到计算器</a>
   <header class="site-header shell">
     <a class="brand" href="#" aria-label="伊莫虹天气计算器首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>YIMO <span class="brand-slash">/</span> KIRA LAB</span></a>
-    <nav aria-label="主导航"><a href="#calculator">计算器</a><a href="#method">计算过程</a><a href="#sources">数据来源 <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="主导航"><a href="#calculator">计算器</a><a href="#distribution">幸运分布</a><a href="#method">计算过程</a><a href="#sources">数据来源 <span aria-hidden="true">↗</span></a></nav>
   </header>
 
   <main>
@@ -97,8 +97,27 @@
       </div>
     </section>
 
+    <section id="distribution" class="distribution-section shell" aria-labelledby="distribution-title">
+      <div class="section-heading"><div><p class="eyebrow">02 / YOUR LUCK, IN COUNTS</p><h2 id="distribution-title">平均值之外，看看幸运的分布。</h2></div><p>统计成功捕获次数，精华直出记 0 次。<br>所有立方共用，不包含失败投掷次数。</p></div>
+      <div class="distribution-panel panel">
+        <div class="distribution-heading"><div><h3>成功捕获多少次，等到一场虹天气？</h3><p id="distribution-context">按当前最多精华次数计算。</p></div><span class="source-badge simulation">离散模拟 · 非正态拟合</span></div>
+        <div id="distribution-error" class="input-error" role="alert" hidden></div>
+        <div id="distribution-content">
+          <div class="distribution-facts"><span>期望 <strong id="distribution-mean">—</strong></span><span>中位数 <strong id="distribution-median">—</strong></span><span>标准差 <strong id="distribution-standard-deviation">—</strong></span><span>样本路径 <strong id="distribution-samples">—</strong></span></div>
+          <div class="distribution-plot" id="distribution-plot" aria-label="成功捕获完成次数的离散直方图"></div>
+          <p class="distribution-chart-help">在图中横向拖选区间，或使用下方滑块。滑块支持键盘方向键与 Home / End。</p>
+          <div class="distribution-ranges"><label for="distribution-lower"><span>区间起点 <output id="distribution-lower-value">—</output></span><input id="distribution-lower" type="range" min="0" max="1" step="1" value="0" disabled></label><label for="distribution-upper"><span>区间终点 <output id="distribution-upper-value">—</output></span><input id="distribution-upper" type="range" min="0" max="1" step="1" value="1" disabled></label></div>
+          <div class="distribution-probabilities" aria-live="polite" aria-atomic="true"><div><span id="distribution-interval-label">区间内完成</span><strong id="distribution-interval-probability">—</strong><small>P(L ≤ N ≤ U)</small></div><div><span id="distribution-cumulative-label">截至终点累计完成</span><strong id="distribution-cumulative-probability">—</strong><small>P(N ≤ U)</small></div><div><span id="distribution-tail-label">终点之后仍未完成</span><strong id="distribution-tail-probability">—</strong><small>P(N &gt; U)</small></div></div>
+          <div class="distribution-rare"><div><span>0 次捕获完成 <span class="tiny-source">解析</span></span><strong id="distribution-zero-probability">—</strong><small>精华直出，或精华阶段虹能保底。</small></div><div><span>首只成功捕获直出 · 全路径 <span class="tiny-source">解析</span></span><strong id="distribution-first-direct">—</strong><small id="distribution-first-note">最左侧稀有概率单独列出，包含精华阶段未直出的权重。</small></div></div>
+          <div class="luck-heading"><h4>你的幸运，会落在哪一档？</h4><p>p95 是完成次数的下尾 5% 分位门槛；有并列时，不表示严格超越 95% 的玩家。p100 是理论最少次数。</p></div>
+          <div id="distribution-quantiles" class="luck-grid" aria-label="幸运档位与对应成功捕获次数"></div>
+          <p id="distribution-note" class="distribution-note">图形分箱仅用于展示，区间概率与分位数始终使用完整的整数次数分布，不插值。模拟样本最大值不是游戏理论保底次数。</p>
+        </div>
+      </div>
+    </section>
+
     <section id="method" class="method-section" aria-labelledby="method-title"><div class="shell">
-      <div class="section-heading"><div><p class="eyebrow">02 / BEHIND THE NUMBERS</p><h2 id="method-title">每一步，都算得明白。</h2></div><p>捕获率 → 出天气停止次数 → 净花费<br>公式、代入与来源，一起展开。</p></div>
+      <div class="section-heading"><div><p class="eyebrow">03 / BEHIND THE NUMBERS</p><h2 id="method-title">每一步，都算得明白。</h2></div><p>捕获率 → 出天气停止次数 → 净花费<br>公式、代入与来源，一起展开。</p></div>
       <div class="explain-controls"><span>查看一次具体计算</span><label><span class="sr-only">选择立方</span><select id="explain-cube"></select></label><label id="explain-target-control"><span class="sr-only">选择伊莫区域与成长阶段</span><select id="explain-target"></select></label><span id="explain-custom-target" class="custom-target-label" hidden>单一目标 · 基础率 16%</span></div>
 
       <article class="method-card">
@@ -123,6 +142,7 @@
           <div class="formula-block"><h4>先尝试精华，未出天气的路径才继续捕获。</h4><div id="formula-energy" class="math-equation"></div><div id="formula-survival" class="math-equation"></div><div id="formula-energy-numeric" class="math-equation numeric"></div><p><var>n</var> 是最多先使用精华的次数，单位“次”，为非负整数；<var>a</var>=min(n,22) 是保底前最多可能使用的次数。每次精华 3% 直出天气；未直出时获得官网公示的 480 虹能 / 次。<var>s</var> 是这 a 次都未直出的概率；<var>r</var> 是这一条件下的剩余保底虹能。最多 22 次即可由直出或虹能保底完成，不一定会使用满 n 次。</p><div id="formula-stop" class="math-equation"></div><div id="formula-weather-mean" class="math-equation"></div><p><var>W<sub>t</sub></var> 表示第 t 次成功捕获后，触发的幸运事件是否直接出天气；每次普通或超级幸运事件只判定一次 0.6%。<var>R<sub>t</sub></var> 是该次成功捕获获得的虹能。<var>N<sub>w</sub>(r)</var> 是开始捕获后，首次直接出天气或满虹能保底所需的成功捕获只数；<var>K<sub>w</sub>(r)</var> 是它的条件期望，单位“只”。最终 <var>E[N]</var> 把精华已直出的零捕获路径一起计入，故 n&lt;22 时为 s×K<sub>w</sub>(r)，n≥22 时为 0。</p><div id="formula-weather-numeric" class="math-equation numeric"></div><div id="formula-reward" class="math-equation"></div><p>普通幸运未直出天气时，每次奖励的均值为 302.5 虹能。每周概率、独立保底及提前停止使过程不能按剩余虹能线性缩放；本模型对各剩余目标分别统计天气停止次数。</p><div id="formula-geometric" class="math-equation"></div><p><var>q</var> 是当前幸运档位的触发概率；<var>H</var> 是该档位的保底次数；<var>G</var> 是自然触发所需有效判定次数，从 1 开始；<var>T</var> 是加入保底后的等待次数。两个幸运时钟按超级优先规则耦合，天气停止则由完整过程模拟统计。</p></div>
           <div class="simulation-result"><div><span class="eyebrow" id="simulation-samples">5,000,000 SIMULATED RUNS</span><strong id="simulation-expected">— <small>只 · 最终期望</small></strong></div><p id="simulation-precision">按当前精华次数查表计算。</p></div>
           <p class="small-note">均值的 95% 蒙特卡洛区间描述模拟对“平均次数”的估计精度，<strong>不是单个玩家的 95% 捕捉次数或预算范围</strong>。500 万条捕获路径共享用于各剩余门槛，精华 3% 直出概率以解析公式合并。</p>
+          <div class="formula-block"><h4>把每一个整数完成次数，保留成一条概率。</h4><div id="formula-distribution-mixture" class="math-equation"></div><p><var>h<sub>n</sub>(k)</var> 是精华均未直出时的条件捕获概率，由模拟频次 <var>c<sub>n,k</sub></var> 除以路径总数 <var>M</var>=5,000,000 得到；频次和路径数的单位均为“条”。<var>s</var>=0.97<sup>n</sup> 来自精华每次3%直出的官网规则。下式的 <var>f(k)</var> 把零捕获分支一起纳入；n≥22时所有概率集中在0次。</p><div id="formula-distribution" class="math-equation"></div><div id="formula-luck-quantile" class="math-equation"></div><p><var>f(k)</var> 是恰好在 k 次成功捕获后完成的概率，<var>F(k)</var> 是截至 k 次累计完成概率，均无单位；区间 [L,U] 包含两端。幸运度 pℓ 对应下尾分位 u=(100−ℓ)/100，取累计概率达到 u 的最小整数，不在整数之间插值。p100 单独定义为理论最小支持：零精华时为 1 次，使用精华时可为 0 次，不表示所有玩家能在该次数完成。</p><div id="formula-first-weather" class="math-equation"></div><p>上式解释图中“首只成功捕获直出”的解析概率，适用于n&lt;22：0.002是本周首次超级幸运率；未触发超级的0.998分支再乘首次普通幸运率0.01；两类幸运事件都以0.006概率直接出天气。再乘精华未直出的权重s。它不含第一只通过虹能保底完成的概率；n≥22时无需捕获，首抓直出概率为0。</p></div>
         </div>
       </article>
 
@@ -136,11 +156,11 @@
     </div></section>
 
     <section id="sources" class="sources-section shell" aria-labelledby="sources-title">
-      <div class="section-heading"><div><p class="eyebrow">03 / OPEN NOTES</p><h2 id="sources-title">数字有出处，假设也透明。</h2></div><a class="text-link" href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">阅读官网概率公示 <span aria-hidden="true">↗</span></a></div>
+      <div class="section-heading"><div><p class="eyebrow">04 / OPEN NOTES</p><h2 id="sources-title">数字有出处，假设也透明。</h2></div><a class="text-link" href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">阅读官网概率公示 <span aria-hidden="true">↗</span></a></div>
       <div class="sources-grid">
         <article class="source-card"><span class="source-badge official">官网公示</span><h3>游戏公布的规则</h3><p>15类基础捕获率、立方倍率、背袭×1.5、等级差系数表、联结者捕获加成乘算公式，以及幸运事件触发概率、保底、虹能奖励。精华每次 3% 直接出天气，未直出时 +480 虹能；普通和超级幸运事件各有 0.6% 直接天气，虹能保底为 10,500。</p><a href="https://www.yimo.com/formula-multipliers" target="_blank" rel="noopener noreferrer">《伊莫》概率公示 ↗</a><small>规则核对：2026-10-30</small></article>
         <article class="source-card"><span class="source-badge user">用户给定 / 确认</span><h3>路线、价格与基础汇报</h3><p>立方单价 3,500 / 7,000 / 10,500 金币；捕获加成默认1%、最终加算口径，可切换官网乘算并编辑数值；普通伊莫、全部战斗外、满血。正背比例、等级差、最多精华次数和汇报加成可调；默认正面70%、背面30%、等级差10、精华0次、汇报加成30%。目标可选15类官网配比或用户输入单一基础概率，单一模式默认16%。基础汇报 1,200 金币由用户确认，默认每只 1,560 金币，并非本页引用的官网公示数据。</p><small>仅计算立方支出与基础汇报返还，不计精华自身成本及资质、幽黯等奖励。</small></article>
-        <article class="source-card"><span class="source-badge simulation">模拟结果</span><h3>500 万条天气停止路径</h3><p>按每周幸运档位、独立保底、奖励与每次幸运事件 0.6% 天气直出，记录各剩余门槛的首次完成次数。共享路径分别统计条件 K<sub>w</sub>(r)；以 0.97<sup>a</sup> 合并精华提前完成路径，得到最终 E[N]。改变正背、等级或汇报加成，不改变天气停止次数。</p><a href="./data/weather-results.json" target="_blank" rel="noopener noreferrer">天气模型查表数据 ↗</a> <a href="https://github.com/uiharuayako/yimo-kira-cost" target="_blank" rel="noopener noreferrer">查看复算代码 ↗</a><small>当前模型纳入直出天气；页面区间仅表示蒙特卡洛均值误差。</small></article>
+        <article class="source-card"><span class="source-badge simulation">模拟结果</span><h3>500 万条天气停止路径</h3><p>按每周幸运档位、独立保底、奖励与每次幸运事件 0.6% 天气直出，记录各剩余门槛的首次完成次数。保留全部整数完成频次，不作正态拟合；直方图分箱不改变区间概率或离散分位数。共享路径分别统计条件 K<sub>w</sub>(r)；以 0.97<sup>a</sup> 合并精华提前完成路径，得到最终 E[N]。改变正背、等级或汇报加成，不改变天气停止次数。</p><a href="./data/weather-results.json" target="_blank" rel="noopener noreferrer">天气模型查表数据 ↗</a> <a href="./data/weather-distribution.json" target="_blank" rel="noopener noreferrer">完整整数频次分布 ↗</a> <a href="https://github.com/uiharuayako/yimo-kira-cost" target="_blank" rel="noopener noreferrer">查看复算代码 ↗</a><small>均值的95%置信区间只表示蒙特卡洛均值误差；可拖选的次数区间描述玩家路径概率，两者含义不同。</small></article>
         <article class="source-card assumptions"><span class="source-badge assumption">建模假设</span><h3>公示之外，明确约定</h3><ul><li>只抓普通伊莫，排除头目；所有成功捕获都符合幸运判定条件，状态系数为 1。</li><li>初始虹能为 0；最多先滋养 n 次，出天气或虹能保底即停，再在未完成路径中捕获。本周两类幸运次数和保底计数从 0 开始，全程不跨周。</li><li>两类保底各自累计，仅触发本类时重置；超级触发当次普通判定与普通保底计数暂停。</li><li>精华每次 3% 直出、每次幸运事件 0.6% 直出，按独立判定处理；直出立即完成，未直出才增加相应虹能。</li><li>正背面、捕获成败与后续幸运事件按给定概率独立处理；每只成功捕获都提交基础汇报，包括触发天气的最后一只。</li></ul></article>
       </div>
       <p class="source-footnote">官网未完整说明双保底计数的实现细节；本页明确采用以上约定。若实际游戏中的判定条件、计数或奖励规则不同，需要重新计算。汇报基础额及加成来自用户确认，不能视为官网公示。</p>

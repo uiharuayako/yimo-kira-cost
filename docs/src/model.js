@@ -4,7 +4,7 @@
  * not rerun or change that simulation.
  */
 
-import { WEATHER_ESTIMATES } from './weather-estimates.js?v=96c75c89dfb6';
+import { WEATHER_ESTIMATES } from './weather-estimates.js?v=21e86f820207';
 
 function deepFreeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {

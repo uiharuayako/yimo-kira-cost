@@ -1,5 +1,6 @@
 import katex from '../vendor/katex/katex.mjs';
 import { BASE_RATES, REGIONS, STAGES, CUBES, MODEL, defaultWeights, calculate, getEnergyModel, getCaptureSettings, getReportSettings, getTargetSettings } from './model.js';
+import { getWeatherDistribution, getIntervalProbability, getDistributionBins } from './distribution.js';
 
 const STORAGE_KEY = 'yimo-kira-lab:v1';
 const $ = (id) => document.getElementById(id);
@@ -11,6 +12,8 @@ const compactPercent = (value) => `${shortNumber.format(value * 100)}%`;
 const decimal = (value, digits = 6) => String(Number(value.toFixed(digits)));
 const texNumber = (value) => number.format(value).replaceAll(',', String.raw`\,`);
 const displayAmount = (value) => Math.abs(value) >= 1e10 ? value.toExponential(3) : number.format(value);
+const distributionState = { data: null, essenceKey: null, lower: 0, upper: 0, activeLuck: 50, drag: null, geometry: null, bins: [] };
+const probabilityLabel = (p) => `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: p > 0 && p < .001 ? 6 : 3 }).format(p * 100)}%`;
 
 function restoredState() {
   try {
@@ -76,6 +79,10 @@ renderMath('formula-geometric', String.raw`T=\min(G,H),\quad G\sim\operatorname{
 renderMath('formula-cost', String.raw`\mathbb E[B_m]=\frac{\mathbb E[N]}{P_m},\qquad \mathbb E[C_{\mathrm{gross},m}]=c_m\frac{\mathbb E[N]}{P_m}`);
 renderMath('formula-refund', String.raw`\mathbb E[F]=\mathbb E[N]\times1\,200(1+\gamma)`);
 renderMath('formula-net', String.raw`\mathbb E[C_{\mathrm{net},m}]=\mathbb E[C_{\mathrm{gross},m}]-\mathbb E[F]`);
+renderMath('formula-distribution-mixture', String.raw`h_n(k)=\frac{c_{n,k}}{M},\quad f(k)=\begin{cases}1-s,&k=0\\s\,h_n(k),&k\ge1\end{cases}\quad(n<22)`);
+renderMath('formula-distribution', String.raw`f(k)=P(N=k),\quad F(k)=\sum_{j=0}^{k}f(j),\quad P(L\le N\le U)=F(U)-F(L-1)`);
+renderMath('formula-luck-quantile', String.raw`u=\frac{100-\ell}{100},\quad p\ell=\min\{k:F(k)\ge u\}\ (u>0),\quad p100=\min\operatorname{supp}(N)`);
+renderMath('formula-first-weather', String.raw`P(\text{首抓直出})=s\,[0.002+(1-0.002)\times0.01]\times0.006=s\times0.00007188`);
 
 function remember() {
   const storedWeights = state.weights.length === 15 && state.weights.every(w => Number.isFinite(w) && w >= 0) ? state.weights : defaultWeights();
@@ -193,6 +200,134 @@ function updateFormula(result, capture, report, target = getTargetSettings(optio
   appendMath('formula-cost-numeric', String.raw`\mathbb E[C_{\mathrm{net},m}]\approx${texNumber(entry.expectedCost/10000)}-${texNumber(entry.expectedRefund/10000)}\approx${texNumber(entry.expectedNetCost/10000)}\ \text{万金币}`);
 }
 
+function distributionSvgElement(tag, attrs = {}, text) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.entries(attrs).forEach(([name,value]) => element.setAttribute(name,String(value)));
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function drawDistribution() {
+  const data = distributionState.data;
+  if (!data?.valid || $('distribution-content').hidden) return;
+  const plot = $('distribution-plot');
+  const width = Math.round(plot.getBoundingClientRect().width);
+  if (width < 1) return;
+  const height = width < 500 ? 284 : 318;
+  const left = 58, right = 16, top = 28, bottom = 56;
+  const innerWidth = Math.max(1,width-left-right), innerHeight = height-top-bottom;
+  const maximum = data.observedMax;
+  const x = n => left + (n+.5)/(maximum+1)*innerWidth;
+  const bins = getDistributionBins(data, Math.max(18,Math.min(85,Math.floor(innerWidth/9))));
+  const maxProbability = Math.min(1,Math.max(...bins.map(bin=>bin.probability),.000001)*1.12);
+  const y = p => top + innerHeight*(1-p/maxProbability);
+  const el=distributionSvgElement;
+  const svg=el('svg',{class:'distribution-chart',viewBox:`0 0 ${width} ${height}`,width,height,role:'img','aria-label':`成功捕获次数的离散完成分布；当前选择${distributionState.lower}至${distributionState.upper}次。紫色为选中区间的概率，灰紫色为全部概率。`});
+  svg.append(el('title',{},'完成次数离散直方图，未作正态拟合'));
+  svg.append(el('desc',{},`数据来自${integer.format(data.samples)}条模拟路径与精华零捕获分支的解析混合。图形分箱仅用于显示。模拟样本最大为${maximum}次，不是理论保底。`));
+  svg.append(el('rect',{'data-distribution-frame':'',x:left,y:top,width:innerWidth,height:innerHeight,fill:'none',stroke:'var(--line)','stroke-width':1}));
+  for(let i=0;i<=4;i++) {
+    const p=maxProbability*i/4,py=y(p);
+    if(i>0&&i<4)svg.append(el('line',{x1:left,y1:py,x2:width-right,y2:py,class:'distribution-grid-line'}));
+    svg.append(el('text',{x:left-9,y:py+4,'text-anchor':'end',class:'distribution-axis-label'},shortNumber.format(p*100)));
+  }
+  const desired = width < 500 ? 3 : 5;
+  const rawStep = Math.max(1,maximum/desired);
+  const magnitude = 10**Math.floor(Math.log10(rawStep));
+  const step = Math.max(1,Math.ceil(rawStep/magnitude)*magnitude);
+  const ticks = maximum === 0 ? [0] : Array.from({length:Math.floor(maximum/step)+1},(_,i)=>i*step);
+  ticks.forEach(tick=>svg.append(el('text',{x:x(tick),y:height-bottom+21,'text-anchor':tick===0?'start':'middle',class:'distribution-axis-label'},integer.format(tick))));
+  svg.append(el('text',{x:left,y:15,class:'distribution-axis-title'},'每个分箱的概率（%）'));
+  svg.append(el('text',{x:left+innerWidth/2,y:height-8,'text-anchor':'middle',class:'distribution-axis-title'},'成功捕获次数（次）'));
+  const selectedLeft=x(distributionState.lower-.5), selectedRight=x(distributionState.upper+.5);
+  svg.append(el('rect',{x:selectedLeft,y:top,width:Math.max(1,selectedRight-selectedLeft),height:innerHeight,class:'distribution-selected-band'}));
+  bins.forEach(bin=>{
+    const px=x(bin.lower-.5),barWidth=Math.max(.5,(bin.upper-bin.lower+1)/(maximum+1)*innerWidth-1);
+    svg.append(el('rect',{x:px+.5,y:y(bin.probability),width:barWidth,height:Math.max(0,y(0)-y(bin.probability)),class:'distribution-bin','data-bin-lower':bin.lower,'data-bin-upper':bin.upper}));
+    const low=Math.max(bin.lower,distributionState.lower),high=Math.min(bin.upper,distributionState.upper);
+    if(low<=high){
+      const selected=getIntervalProbability(data,low,high).probability;
+      svg.append(el('rect',{x:px+.5,y:y(selected),width:barWidth,height:Math.max(0,y(0)-y(selected)),class:'distribution-bin-selected'}));
+    }
+  });
+  if(maximum>0){
+    const meanX=x(data.mean);
+    svg.append(el('line',{x1:meanX,y1:top+22,x2:meanX,y2:height-bottom,class:'distribution-mean-line'}));
+    svg.append(el('text',{x:Math.min(width-right-4,Math.max(left+4,meanX)),y:top+14,'text-anchor':meanX>left+innerWidth*.7?'end':'start',class:'distribution-mean-label'},`均值 ${number.format(data.mean)}`));
+  }
+  [distributionState.lower,distributionState.upper].forEach((n,index)=>{
+    const px=x(index===0?n-.5:n+.5);
+    svg.append(el('line',{x1:px,y1:top,x2:px,y2:height-bottom,class:'distribution-range-edge'}));
+    svg.append(el('rect',{x:px-3,y:top+innerHeight/2-15,width:6,height:30,rx:3,class:'distribution-range-grip'}));
+  });
+  plot.replaceChildren(svg);
+  distributionState.geometry={left,right,top,bottom,width,height,innerWidth,maximum};
+  distributionState.bins=bins;
+}
+
+function updateDistributionSelection() {
+  const data=distributionState.data;if(!data?.valid)return;
+  const max=data.observedMax;
+  distributionState.lower=Math.max(0,Math.min(max,Math.round(distributionState.lower)));
+  distributionState.upper=Math.max(distributionState.lower,Math.min(max,Math.round(distributionState.upper)));
+  const {lower,upper}=distributionState;
+  const interval=getIntervalProbability(data,lower,upper);
+  $('distribution-lower').value=String(lower);$('distribution-upper').value=String(upper);
+  $('distribution-lower').setAttribute('aria-valuetext',`${integer.format(lower)}次成功捕获`);
+  $('distribution-upper').setAttribute('aria-valuetext',`${integer.format(upper)}次成功捕获`);
+  $('distribution-lower-value').textContent=`${integer.format(lower)} 次`;$('distribution-upper-value').textContent=`${integer.format(upper)} 次`;
+  $('distribution-interval-label').textContent=`${integer.format(lower)}–${integer.format(upper)} 次内完成`;
+  $('distribution-cumulative-label').textContent=`截至 ${integer.format(upper)} 次累计完成`;
+  $('distribution-tail-label').textContent=`${integer.format(upper)} 次之后仍未完成`;
+  $('distribution-interval-probability').textContent=probabilityLabel(interval.probability);
+  $('distribution-cumulative-probability').textContent=probabilityLabel(interval.cumulative);
+  $('distribution-tail-probability').textContent=probabilityLabel(interval.tail);
+  document.querySelectorAll('[data-luck]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.luck)===distributionState.activeLuck)));
+  drawDistribution();
+}
+
+function updateDistribution(energy) {
+  if(!energy.valid){
+    distributionState.data=null;distributionState.essenceKey=null;
+    $('distribution-error').hidden=false;$('distribution-error').textContent='请输入有效的非负整数滋养次数，查看完成次数分布。';
+    $('distribution-content').hidden=true;$('distribution-plot').replaceChildren();$('distribution-quantiles').replaceChildren();
+    ['distribution-mean','distribution-median','distribution-standard-deviation','distribution-samples','distribution-zero-probability','distribution-first-direct','distribution-interval-probability','distribution-cumulative-probability','distribution-tail-probability','distribution-lower-value','distribution-upper-value'].forEach(id=>{$(id).textContent='—';});
+    $('distribution-context').textContent='输入有效滋养次数后显示分布；其他捕获与汇报设置不影响成功捕获次数。';
+    ['distribution-lower','distribution-upper'].forEach(id=>{$(id).disabled=true;});
+    return;
+  }
+  $('distribution-context').textContent=`最多先滋养${integer.format(state.essenceCount)}次；分布包含精华提前完成的0次捕获路径。捕获率与汇报设置不会改变本分布。`;
+  const key=Math.min(state.essenceCount,22);
+  if(distributionState.essenceKey===key&&distributionState.data?.valid)return;
+  const data=getWeatherDistribution(state.essenceCount);
+  $('distribution-error').hidden=data.valid;
+  $('distribution-error').textContent=data.valid?'':data.error;
+  $('distribution-content').hidden=!data.valid;
+  distributionState.data=data;distributionState.essenceKey=key;
+  if(!data.valid)return;
+  const median=data.quantiles.find(q=>q.luck===50);
+  distributionState.lower=0;distributionState.upper=median.n;distributionState.activeLuck=50;
+  $('distribution-mean').textContent=`${number.format(data.mean)} 次`;
+  $('distribution-median').textContent=`${integer.format(median.n)} 次`;
+  $('distribution-standard-deviation').textContent=`${number.format(data.standardDeviation)} 次`;
+  $('distribution-samples').textContent=data.samples?integer.format(data.samples):'无需捕获模拟';
+  $('distribution-zero-probability').textContent=probabilityLabel(data.zeroCaptureProbability);
+  $('distribution-first-direct').textContent=probabilityLabel(data.firstDirectWeatherProbability);
+  $('distribution-first-note').textContent=data.observedMax===0?'无需进入捕获阶段，全部概率集中在0次。':`已包含精华未直出的权重。1次捕获完成合计${probabilityLabel(data.firstCaptureProbability)}为经验估计；解析值只计算直接天气，不含首抓虹能保底。`;
+  $('distribution-quantiles').innerHTML=data.quantiles.map(q=>`<button type="button" class="luck-card" data-luck="${q.luck}" data-quantile-count="${q.n}" aria-pressed="${q.luck===50}" aria-label="查看${q.label}，截至${q.n}次成功捕获的累计概率"><span>${q.label}</span><strong>${integer.format(q.n)}<small>次</small></strong><span class="luck-definition">${q.minimum?'理论最幸运':`下尾${shortNumber.format(q.fraction*100)}%分位`}</span></button>`).join('');
+  $('distribution-quantiles').querySelectorAll('[data-luck]').forEach(button=>button.addEventListener('click',()=>{distributionState.lower=0;distributionState.upper=Number(button.dataset.quantileCount);distributionState.activeLuck=Number(button.dataset.luck);updateDistributionSelection();}));
+  ['distribution-lower','distribution-upper'].forEach(id=>{$(id).min='0';$(id).max=String(data.observedMax);$(id).disabled=data.observedMax===0;});
+  $('distribution-note').textContent=data.observedMax===0?'最多22次精华已保证由直出或虹能保底完成，成功捕获次数确定为0。所有幸运档位并列0次，立方支出和汇报返还均为0。':`图形只做显示分箱，区间与分位数使用完整整数分布，不插值。最大显示次数${integer.format(data.observedMax)}是模拟样本最大值，经验尾部为0不代表游戏理论保底。首抓直出解析概率与稀有事件经验频次可能因抽样误差不同。次数不包含失败投掷，不能直接除以捕获率当作立方数分位。`;
+  updateDistributionSelection();
+}
+
+function distributionPointerCount(event) {
+  const g=distributionState.geometry;if(!g)return null;
+  const rect=$('distribution-plot').getBoundingClientRect();
+  const localX=(event.clientX-rect.left)*g.width/rect.width;
+  return Math.max(0,Math.min(g.maximum,Math.round((localX-g.left)/g.innerWidth*(g.maximum+1)-.5)));
+}
+
 function update({persist=true}={}) {
   const result = currentCalculation();
   const energy = getEnergyModel(state.essenceCount);
@@ -201,6 +336,7 @@ function update({persist=true}={}) {
   updateTargetMode(target);
   updateSettings(capture, report, result);
   updateEnergy(energy);
+  updateDistribution(energy);
   $('mode-description').textContent = state.mode === 'throws' ? '每次投掷选择各类目标的占比，权重会自动归一化。' : '希望成功捕获的各类伊莫占比，按每只目标的平均用球数加权。';
   const settingsValid = capture.valid && report.valid && !result.error?.includes('汇报');
   $('input-error').hidden = result.valid || !energy.valid || !settingsValid;
@@ -273,4 +409,31 @@ $('capture-bonus-mode').addEventListener('change',event=>{state.captureBonusMode
 $('capture-bonus-percent').addEventListener('input',event=>{state.captureBonusRate=event.target.value===''?0:Number(event.target.value)/100;update();});
 $('explain-cube').addEventListener('change',event=>{state.cube=event.target.value;updateFormula(currentCalculation(),getCaptureSettings(options()),getReportSettings(options()));});
 $('explain-target').addEventListener('change',event=>{state.target=Number(event.target.value);updateFormula(currentCalculation(),getCaptureSettings(options()),getReportSettings(options()));});
+$('distribution-lower').addEventListener('input',event=>{distributionState.lower=Number(event.target.value);if(distributionState.lower>distributionState.upper)distributionState.upper=distributionState.lower;distributionState.activeLuck=null;updateDistributionSelection();});
+$('distribution-upper').addEventListener('input',event=>{distributionState.upper=Number(event.target.value);if(distributionState.upper<distributionState.lower)distributionState.lower=distributionState.upper;distributionState.activeLuck=null;updateDistributionSelection();});
+$('distribution-plot').addEventListener('pointerdown',event=>{
+  if(!distributionState.data?.valid||event.button!==0)return;
+  const g=distributionState.geometry,rect=$('distribution-plot').getBoundingClientRect();
+  const y=(event.clientY-rect.top)*g.height/rect.height;
+  if(y<g.top||y>g.height-g.bottom)return;
+  const count=distributionPointerCount(event);
+  const pointPx=(event.clientX-rect.left)*g.width/rect.width;
+  const lowPx=g.left+distributionState.lower/(g.maximum+1)*g.innerWidth;
+  const highPx=g.left+(distributionState.upper+1)/(g.maximum+1)*g.innerWidth;
+  const nearLow=Math.abs(pointPx-lowPx)<18,nearHigh=Math.abs(pointPx-highPx)<18;
+  const kind=nearLow&&(!nearHigh||Math.abs(pointPx-lowPx)<Math.abs(pointPx-highPx))?'lower':nearHigh?'upper':'brush';
+  distributionState.drag={kind,anchor:count};distributionState.activeLuck=null;
+  if(kind==='brush'){distributionState.lower=count;distributionState.upper=count;}
+  $('distribution-plot').setPointerCapture(event.pointerId);updateDistributionSelection();event.preventDefault();
+});
+$('distribution-plot').addEventListener('pointermove',event=>{
+  const drag=distributionState.drag;if(!drag)return;
+  const count=distributionPointerCount(event);
+  if(drag.kind==='brush'){distributionState.lower=Math.min(drag.anchor,count);distributionState.upper=Math.max(drag.anchor,count);}
+  else if(drag.kind==='lower'){distributionState.lower=Math.min(count,distributionState.upper);}
+  else distributionState.upper=Math.max(count,distributionState.lower);
+  updateDistributionSelection();
+});
+['pointerup','pointercancel'].forEach(type=>$('distribution-plot').addEventListener(type,event=>{distributionState.drag=null;if($('distribution-plot').hasPointerCapture(event.pointerId))$('distribution-plot').releasePointerCapture(event.pointerId);}));
+new ResizeObserver(()=>drawDistribution()).observe($('distribution-plot'));
 update({persist:false});
